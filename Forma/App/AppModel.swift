@@ -1,0 +1,305 @@
+import Foundation
+import AppKit
+import QuickLookThumbnailing
+import UniformTypeIdentifiers
+
+enum ItemStatus: Equatable {
+    case pending
+    case processing(Double)
+    case done
+    case failed(String)
+    case skipped(String)
+    case cancelled
+
+    var isFinished: Bool {
+        switch self { case .done, .failed, .skipped, .cancelled: true; default: false }
+    }
+}
+
+@MainActor
+@Observable
+final class FileItem: Identifiable {
+    let id = UUID()
+    let url: URL
+    let inputClass: InputClass
+    let kind: MediaKind
+    let size: Int64
+    var status: ItemStatus = .pending
+    var outputs: [URL] = []
+    var outputSize: Int64 = 0
+    var note: String?
+    var targetOverride: String?        // per-file output format
+    var thumbnail: NSImage?
+    var startedAt: Date?
+    var finishedAt: Date?
+
+    init(url: URL) {
+        self.url = url
+        inputClass = FileDetection.classify(url)
+        kind = inputClass.mediaKind ?? .image
+        size = url.fileSize
+    }
+
+    var name: String { url.lastPathComponent }
+    var inputExt: String { url.pathExtension.uppercased() }
+    var savings: Double? {
+        guard status == .done, size > 0, outputSize > 0 else { return nil }
+        return 1 - Double(outputSize) / Double(size)
+    }
+    var progress: Double {
+        switch status {
+        case .processing(let p): p
+        case .done, .failed, .skipped, .cancelled: 1
+        case .pending: 0
+        }
+    }
+}
+
+@MainActor
+@Observable
+final class AppModel {
+    static let shared = AppModel()
+
+    var mode: ProcessMode {
+        didSet { PreferencesStore.shared.prefs.lastMode = mode }
+    }
+    var convertItems: [FileItem] = []
+    var compressItems: [FileItem] = []
+    var isRunning = false
+    var isPaused = false
+    var runningMode: ProcessMode?
+    var selection = Set<FileItem.ID>()
+    var lastBatchSummary: String?
+    var compareItem: FileItem?
+
+    private var runTask: Task<Void, Never>?
+    private var pauseContinuations: [CheckedContinuation<Void, Never>] = []
+
+    private init() {
+        mode = PreferencesStore.shared.prefs.lastMode
+    }
+
+    var prefs: Preferences {
+        get { PreferencesStore.shared.prefs }
+        set { PreferencesStore.shared.prefs = newValue }
+    }
+
+    func items(for mode: ProcessMode) -> [FileItem] { mode == .convert ? convertItems : compressItems }
+    var items: [FileItem] { items(for: mode) }
+
+    private func setItems(_ list: [FileItem], for mode: ProcessMode) {
+        if mode == .convert { convertItems = list } else { compressItems = list }
+    }
+
+    // MARK: Adding
+
+    @discardableResult
+    func add(_ urls: [URL], mode: ProcessMode? = nil, autoStart: Bool? = nil) -> Int {
+        let m = mode ?? self.mode
+        if let mode { self.mode = mode }
+        let existing = Set(items(for: m).map(\.url))
+        let files = Pipeline.expand(urls).filter { !existing.contains($0) }
+        guard !files.isEmpty else { return 0 }
+        let new = files.map(FileItem.init)
+        setItems(items(for: m) + new, for: m)
+        new.forEach(loadThumbnail)
+        let shouldStart = autoStart ?? (m == .compress && prefs.autoStartOnDrop)
+        if shouldStart { start(mode: m) }
+        return new.count
+    }
+
+    private func loadThumbnail(_ item: FileItem) {
+        let req = QLThumbnailGenerator.Request(fileAt: item.url, size: CGSize(width: 64, height: 64),
+                                               scale: NSScreen.main?.backingScaleFactor ?? 2, representationTypes: [.thumbnail, .icon])
+        QLThumbnailGenerator.shared.generateBestRepresentation(for: req) { rep, _ in
+            guard let img = rep?.nsImage else { return }
+            Task { @MainActor in item.thumbnail = img }
+        }
+    }
+
+    // MARK: Queue control
+
+    func start(mode: ProcessMode? = nil, snapshot: ProcessingSnapshot? = nil) {
+        let m = mode ?? self.mode
+        guard !isRunning else { return }
+        let pending = items(for: m).filter { $0.status == .pending || $0.status == .cancelled }
+        guard !pending.isEmpty else { return }
+        pending.forEach { $0.status = .pending }
+        isRunning = true
+        isPaused = false
+        runningMode = m
+        lastBatchSummary = nil
+        let snap = snapshot ?? prefs.processing
+        let imageWidth = SystemInfo.imageParallelism(requested: prefs.maxParallelImages)
+        let mediaWidth = max(1, prefs.maxParallelVideos)
+
+        runTask = Task { [weak self] in
+            guard let self else { return }
+            let started = Date()
+            let images = pending.filter { $0.kind == .image || $0.kind == .document }
+            let media = pending.filter { $0.kind == .video || $0.kind == .audio }
+            await withTaskGroup(of: Void.self) { group in
+                group.addTask { await self.lane(images, width: imageWidth, mode: m, snapshot: snap) }
+                group.addTask { await self.lane(media, width: mediaWidth, mode: m, snapshot: snap) }
+            }
+            self.finishBatch(pending, mode: m, elapsed: Date().timeIntervalSince(started))
+        }
+    }
+
+    private func lane(_ items: [FileItem], width: Int, mode: ProcessMode, snapshot: ProcessingSnapshot) async {
+        guard !items.isEmpty else { return }
+        var iterator = items.enumerated().makeIterator()
+        await withTaskGroup(of: Void.self) { group in
+            func enqueueNext() async -> Bool {
+                await self.waitIfPaused()
+                guard !Task.isCancelled, let (i, item) = iterator.next() else { return false }
+                group.addTask { await self.process(item, index: i + 1, mode: mode, snapshot: snapshot) }
+                return true
+            }
+            for _ in 0..<width { if !(await enqueueNext()) { break } }
+            while await group.next() != nil {
+                _ = await enqueueNext()
+            }
+        }
+    }
+
+    private func process(_ item: FileItem, index: Int, mode: ProcessMode, snapshot: ProcessingSnapshot) async {
+        if Task.isCancelled { item.status = .cancelled; return }
+        item.status = .processing(0.02)
+        item.startedAt = Date()
+        let url = item.url
+        let override = item.targetOverride.flatMap(FormatCatalog.format)
+        let throttle = ProgressThrottle()
+        do {
+            let result = try await Pipeline.run(input: url, mode: mode, snapshot: snapshot, index: index, targetOverride: override) { p in
+                guard throttle.shouldEmit(p) else { return }
+                Task { @MainActor in if case .processing = item.status { item.status = .processing(max(0.02, p)) } }
+            }
+            item.outputs = result.outputs
+            item.outputSize = result.outputSize
+            item.note = result.note
+            item.status = result.skipped ? .skipped(result.note ?? "Ignoré") : .done
+        } catch is CancellationError {
+            item.status = .cancelled
+        } catch {
+            item.status = Task.isCancelled ? .cancelled : .failed(error.localizedDescription)
+        }
+        item.finishedAt = Date()
+    }
+
+    private func finishBatch(_ batch: [FileItem], mode: ProcessMode, elapsed: TimeInterval) {
+        isRunning = false
+        isPaused = false
+        runningMode = nil
+        runTask = nil
+        let done = batch.filter { $0.status == .done }
+        let failed = batch.filter { if case .failed = $0.status { true } else { false } }
+        let before = done.reduce(Int64(0)) { $0 + $1.size }
+        let after = done.reduce(Int64(0)) { $0 + ($1.outputs.isEmpty ? $1.size : $1.outputSize) }
+        var summary = "\(done.count) fichier\(done.count > 1 ? "s" : "") traité\(done.count > 1 ? "s" : "") en \(Self.format(elapsed))"
+        if before > after { summary += " · \((before - after).formattedBytes) économisés" }
+        if !failed.isEmpty { summary += " · \(failed.count) échec\(failed.count > 1 ? "s" : "")" }
+        lastBatchSummary = summary
+        guard !done.isEmpty || !failed.isEmpty else { return }
+
+        let outputs = done.flatMap(\.outputs)
+        if prefs.autoCopyResult, !outputs.isEmpty {
+            let pb = NSPasteboard.general
+            pb.clearContents()
+            pb.writeObjects(outputs as [NSURL])
+        }
+        if prefs.processing.output.revealWhenDone, !outputs.isEmpty {
+            NSWorkspace.shared.activateFileViewerSelecting(outputs)
+        }
+        if prefs.notifyWhenDone, !NSApp.isActive {
+            Notifier.post(title: mode == .convert ? "Conversion terminée" : "Compression terminée", body: summary)
+        }
+        if !NSApp.isActive { NSApp.requestUserAttention(.informationalRequest) }
+    }
+
+    static func format(_ t: TimeInterval) -> String {
+        t < 60 ? String(format: "%.1f s", t) : String(format: "%d min %02d s", Int(t) / 60, Int(t) % 60)
+    }
+
+    func pause() { isPaused = true }
+
+    func resume() {
+        isPaused = false
+        let c = pauseContinuations
+        pauseContinuations.removeAll()
+        c.forEach { $0.resume() }
+    }
+
+    private func waitIfPaused() async {
+        guard isPaused else { return }
+        await withCheckedContinuation { pauseContinuations.append($0) }
+    }
+
+    func cancel() {
+        runTask?.cancel()
+        resume()
+    }
+
+    // MARK: List management
+
+    func remove(_ ids: Set<FileItem.ID>) {
+        setItems(items.filter { !ids.contains($0.id) || $0.status.isProcessing }, for: mode)
+        selection.subtract(ids)
+    }
+
+    func clearFinished() {
+        setItems(items.filter { !$0.status.isFinished }, for: mode)
+    }
+
+    func removeAll() {
+        guard !isRunning || runningMode != mode else { return }
+        setItems([], for: mode)
+        selection.removeAll()
+    }
+
+    func reset(_ item: FileItem) {
+        item.status = .pending
+        item.outputs = []
+        item.outputSize = 0
+        item.note = nil
+    }
+
+    func retryFailed() {
+        for i in items where { if case .failed = i.status { true } else { false } }() { reset(i) }
+        start()
+    }
+
+    func resetAndRun() {
+        items.forEach(reset)
+        start()
+    }
+
+    var pendingCount: Int { items.filter { $0.status == .pending }.count }
+    var doneCount: Int { items.filter { $0.status.isFinished }.count }
+    var overallProgress: Double {
+        let list = runningMode.map(items(for:)) ?? items
+        guard !list.isEmpty else { return 0 }
+        return list.reduce(0) { $0 + $1.progress } / Double(list.count)
+    }
+    var totalSaved: Int64 {
+        items.filter { $0.status == .done && !$0.outputs.isEmpty }.reduce(Int64(0)) { $0 + max(0, $1.size - $1.outputSize) }
+    }
+}
+
+extension ItemStatus {
+    var isProcessing: Bool { if case .processing = self { true } else { false } }
+}
+
+/// Limits progress callbacks to ~15/s per file so a 4K encode never floods the main thread.
+final class ProgressThrottle: @unchecked Sendable {
+    private var last = Date.distantPast
+    private var lastValue = -1.0
+    private let lock = NSLock()
+    func shouldEmit(_ v: Double) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        let now = Date()
+        guard now.timeIntervalSince(last) > 0.066 || v >= 0.99 || abs(v - lastValue) > 0.1 else { return false }
+        last = now; lastValue = v
+        return true
+    }
+}
