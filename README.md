@@ -8,6 +8,10 @@ Native macOS converter and compressor (SwiftUI, macOS 26, Apple Silicon), modele
   RAW, PSD, SVG, PDF (page by page), EPS and AI as input.
 - **Compress**: 7 image presets (+ quality, target file size), video presets (HEVC VideoToolbox), audio presets.
   pngquant + oxipng, MozJPEG (jpegtran), gifsicle, Ghostscript for PDFs. Never makes a file bigger ("Already optimized").
+- **Upscale ×2 (AI)**: Apple's on-device super-resolution model (VideoToolbox `VTSuperResolutionScaler`, Neural Engine).
+  Tiles ≤ 1920 px with clamped context at ×4, Lanczos down to ×2 (supersampling, no seams/borders), alpha and
+  16-bit preserved, EXIF orientation applied. ~1 s per input megapixel on an M3 Pro. Lanczos fallback on Intel.
+  `forma upscale <images> [--to fmt]`, Shortcut "Agrandir des images ×2", Finder service, ⌘3.
 - **Image processing**: resize (fit, width, height, exact with padding, stretch, %), color space + rendering intent,
   DPI, orientation, metadata (keep all / essentials / strip), copyright, watermark (image, position, opacity, tile).
 - **Video**: codec, quality, speed, hardware acceleration with software fallback, instant remux, resolution, fps,

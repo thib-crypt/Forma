@@ -75,6 +75,9 @@ final class ServicesProvider: NSObject {
     @objc func compressFiles(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
         handle(pboard, mode: .compress, start: true)
     }
+    @objc func upscaleFiles(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
+        handle(pboard, mode: .upscale, start: true)
+    }
     private func handle(_ pb: NSPasteboard, mode: ProcessMode?, start: Bool) {
         let urls = (pb.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]) ?? []
         Task { @MainActor in

@@ -116,7 +116,14 @@ struct StatusView: View {
             }
         case .done:
             HStack(spacing: 6) {
-                if let s = item.savings, abs(s) >= 0.005 {
+                if let r = item.resolutionBadge {
+                    Label(r, systemImage: item.note == nil ? "sparkles" : "arrow.up.left.and.arrow.down.right")
+                        .font(.caption.weight(.semibold).monospacedDigit())
+                        .padding(.horizontal, 7).padding(.vertical, 2)
+                        .background(Color.accentColor.opacity(0.16), in: .capsule)
+                        .foregroundStyle(.tint)
+                        .help(item.note ?? "Agrandi ×2 par super-résolution IA")
+                } else if let s = item.savings, abs(s) >= 0.005 {
                     Text(s > 0 ? "−\(Int((s * 100).rounded())) %" : "+\(Int((-s * 100).rounded())) %")
                         .font(.caption.weight(.semibold).monospacedDigit())
                         .padding(.horizontal, 7).padding(.vertical, 2)

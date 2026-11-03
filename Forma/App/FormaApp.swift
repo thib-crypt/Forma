@@ -71,6 +71,7 @@ struct FormaCommands: Commands {
         CommandMenu("Traitement") {
             Button("Convertir") { model.mode = .convert }.keyboardShortcut("1")
             Button("Compresser") { model.mode = .compress }.keyboardShortcut("2")
+            Button("Agrandir ×2 (IA)") { model.mode = .upscale }.keyboardShortcut("3")
             Divider()
             Button(model.isRunning ? "Arrêter" : "Démarrer") {
                 model.isRunning ? model.cancel() : model.start()

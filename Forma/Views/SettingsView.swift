@@ -431,6 +431,7 @@ struct FileNamingSection: View {
             if !o.samePatternForCompress {
                 TextField("Compression", text: $store.prefs.processing.output.compressPattern)
             }
+            TextField("Agrandissement", text: $store.prefs.processing.output.upscalePattern)
             FlowTokens { token in
                 if o.samePatternForCompress || focusConvert { store.prefs.processing.output.convertPattern += token }
                 else { store.prefs.processing.output.compressPattern += token }
@@ -517,7 +518,7 @@ struct AutomationSettings: View {
                             .onChange(of: f.enabled) { FolderWatcher.shared.reload() }
                         VStack(alignment: .leading) {
                             Text(URL(fileURLWithPath: f.path).lastPathComponent).fontWeight(.medium)
-                            Text("\(f.mode.label) · \(f.mode == .convert ? "\(f.imageTarget)/\(f.videoTarget)/\(f.audioTarget)" : "préréglages actuels") → \(f.outputSubfolder)/ · \(f.processedCount) traité(s)")
+                            Text("\(f.mode.label) · \(f.mode == .convert ? "\(f.imageTarget)/\(f.videoTarget)/\(f.audioTarget)" : f.mode == .upscale ? "images ×2 IA" : "préréglages actuels") → \(f.outputSubfolder)/ · \(f.processedCount) traité(s)")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer()
@@ -711,20 +712,25 @@ struct EnginesSettings: View {
                 Text("Forma privilégie les frameworks natifs d'Apple. Les outils Homebrew couvrent les formats exotiques et les optimisations avancées ; ils sont facultatifs.")
             }
             Section {
+                UpscaleModelRow()
+            } header: { Text("Super-résolution IA") } footer: {
+                Text("Modèle d'Apple (VideoToolbox) exécuté sur le Neural Engine. macOS le télécharge une seule fois ; ensuite tout reste hors ligne. L'image est traitée en tuiles à ×4 puis réduite à ×2 en Lanczos pour un résultat sans artefact.")
+            }
+            Section {
                 Toggle("Commande `forma` dans le Terminal", isOn: Binding(get: { cliInstalled }, set: { on in
                     cliError = on ? CLIInstaller.install() : CLIInstaller.uninstall()
                     cliInstalled = CLIInstaller.isInstalled
                 }))
                 if let cliError { Text(cliError).font(.caption).foregroundStyle(.red) }
-                Text("forma convert ~/Desktop/*.heic --to jpg\nforma compress ~/Movies/clip.mov --preset balanced\nforma formats")
+                Text("forma convert ~/Desktop/*.heic --to jpg\nforma compress ~/Movies/clip.mov --preset balanced\nforma upscale ~/Pictures/logo.png\nforma formats")
                     .font(.system(size: 11, design: .monospaced)).foregroundStyle(.secondary).textSelection(.enabled)
             } header: { Text("Ligne de commande") } footer: {
-                Text("Crée un lien symbolique dans /usr/local/bin. Raccourcis : actions « Convertir des fichiers » et « Compresser des fichiers ». Finder : clic droit › Services › Forma.")
+                Text("Crée un lien symbolique dans /usr/local/bin. Raccourcis : actions « Convertir des fichiers », « Compresser des fichiers » et « Agrandir des images ×2 ». Finder : clic droit › Services › Forma.")
             }
             Section("À propos") {
                 LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0")
                 LabeledContent("Formats de sortie", value: "\(FormatCatalog.all.count)")
-                LabeledContent("Confidentialité", value: "100 % local, aucune connexion réseau")
+                LabeledContent("Confidentialité", value: "100 % local (seul macOS télécharge une fois le modèle IA)")
             }
         }
         .formStyle(.grouped)
@@ -738,7 +744,7 @@ struct QuickSettings: View {
     var body: some View {
         Form {
             if mode == .compress { ImageCompressionSection() }
-            ResizeSection()
+            if mode != .upscale { ResizeSection() }
             MetadataSection()
             OutputLocationSection()
         }

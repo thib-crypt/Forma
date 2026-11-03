@@ -2,7 +2,7 @@ import Foundation
 
 /// `forma` command-line interface (the app binary itself, symlinked into /usr/local/bin).
 enum CLI {
-    static let commands: Set<String> = ["convert", "compress", "formats", "tools", "help", "--help", "-h", "--version", "version", "info"]
+    static let commands: Set<String> = ["convert", "compress", "upscale", "formats", "tools", "help", "--help", "-h", "--version", "version", "info"]
 
     static func shouldHandle(_ args: [String]) -> Bool {
         guard args.count > 1 else { return false }
@@ -35,7 +35,7 @@ enum CLI {
         default: break
         }
 
-        let mode: ProcessMode = cmd == "convert" ? .convert : .compress
+        let mode: ProcessMode = cmd == "convert" ? .convert : cmd == "upscale" ? .upscale : .compress
         var snap = PreferencesStore.loadSnapshot().processing
         var target: FormatDescriptor?
         var outDir: URL?
@@ -90,14 +90,19 @@ enum CLI {
             }
         }
         if mode == .convert && target == nil { fputs("Précisez --to <format>.\n", stderr); return 2 }
-        let inputs = Pipeline.expand(files)
+        var inputs = Pipeline.expand(files)
+        if mode == .upscale {
+            inputs = inputs.filter { FileDetection.classify($0).mediaKind == .image }
+            if !Upscaler.isSupported { fputs("Super-résolution IA indisponible : agrandissement Lanczos.\n", stderr) }
+            else if Upscaler.modelState != .ready && !quiet { print("Téléchargement du modèle IA d'Apple (une seule fois)…") }
+        }
         guard !inputs.isEmpty else { fputs("Aucun fichier compatible.\n", stderr); return 1 }
 
         let sem = DispatchSemaphore(value: 0)
         nonisolated(unsafe) var failures: Int32 = 0
         let snapshot = snap, tgt = target, out = outDir
         Task.detached {
-            let width = SystemInfo.imageParallelism(requested: 0)
+            let width = mode == .upscale ? 2 : SystemInfo.imageParallelism(requested: 0)
             await withTaskGroup(of: (URL, Result<PipelineResult, Error>, TimeInterval).self) { group in
                 var iterator = inputs.enumerated().makeIterator()
                 func add() {
@@ -116,7 +121,7 @@ enum CLI {
                             let before = u.fileSize
                             if res.outputs.isEmpty { print("• \(u.lastPathComponent): \(res.note ?? "inchangé")") }
                             else {
-                                let pct = before > 0 && res.outputSize > 0 ? Int((1 - Double(res.outputSize) / Double(max(1, before))) * 100) : 0
+                                let pct = before > 0 && res.outputSize > 0 && mode != .upscale ? Int((1 - Double(res.outputSize) / Double(max(1, before))) * 100) : 0
                                 print("✓ \(u.lastPathComponent) → \(res.outputs.map(\.lastPathComponent).joined(separator: ", ")) · \(res.outputSize.formattedBytes)\(pct > 0 ? " (−\(pct) %)" : "") · \(String(format: "%.2f s", t))")
                             }
                         }
@@ -139,6 +144,8 @@ enum CLI {
     UTILISATION
       forma convert <fichiers|dossiers…> --to <format> [options]
       forma compress <fichiers|dossiers…> [options]
+      forma upscale <images|dossiers…> [--to <format>] [-o <dossier>]
+                               agrandit ×2 par super-résolution IA (Neural Engine)
       forma formats            liste des formats de sortie
       forma tools              état des moteurs (ffmpeg, ImageMagick…)
 

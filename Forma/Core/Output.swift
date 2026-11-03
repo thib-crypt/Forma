@@ -80,15 +80,18 @@ enum OutputResolver {
         try fm.createDirectory(at: folder, withIntermediateDirectories: true)
 
         let pattern: String
-        if mode == .compress && !settings.samePatternForCompress { pattern = settings.compressPattern }
-        else { pattern = settings.convertPattern }
+        switch mode {
+        case .compress where !settings.samePatternForCompress: pattern = settings.compressPattern
+        case .upscale: pattern = settings.upscalePattern.isEmpty ? "{original}@2x" : settings.upscalePattern
+        default: pattern = settings.convertPattern
+        }
         var base = NamePattern.render(pattern, NamePattern.context(for: input, format: format, index: index))
         if let suffix { base += suffix }
         var url = folder.appendingPathComponent(base).appendingPathExtension(format.ext)
 
         // Never overwrite the source itself (unless "replace originals", handled by the pipeline via a temp file).
         if url.standardizedFileURL.path == input.standardizedFileURL.path {
-            url = folder.appendingPathComponent(base + (mode == .compress ? "_compressed" : "_converted")).appendingPathExtension(format.ext)
+            url = folder.appendingPathComponent(base + ["compress": "_compressed", "upscale": "_x2"][mode.rawValue, default: "_converted"]).appendingPathExtension(format.ext)
         }
         guard fm.fileExists(atPath: url.path) else { return url }
         switch settings.conflict {

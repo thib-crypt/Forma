@@ -423,6 +423,7 @@ struct OutputSettings: Codable, Equatable, Sendable {
     var customFolderPath: String? = nil
     var convertPattern = "{original}"
     var compressPattern = "{original}_compressed"
+    var upscalePattern = "{original}@2x"
     var samePatternForCompress = false
     var conflict: ConflictPolicy = .rename
     var replaceOriginals = false            // compress in place (original goes to the Trash)
@@ -449,10 +450,30 @@ struct NamedPreset<T: Codable & Equatable & Sendable>: Codable, Equatable, Ident
 // MARK: - Watched folders / schedule
 
 enum ProcessMode: String, Codable, CaseIterable, Identifiable, Sendable {
-    case convert, compress
+    case convert, compress, upscale
     var id: String { rawValue }
-    var label: String { self == .convert ? "Convertir" : "Compresser" }
-    var symbol: String { self == .convert ? "arrow.triangle.2.circlepath" : "arrow.down.right.and.arrow.up.left" }
+    var label: String {
+        switch self {
+        case .convert: "Convertir"
+        case .compress: "Compresser"
+        case .upscale: "Agrandir"
+        }
+    }
+    var symbol: String {
+        switch self {
+        case .convert: "arrow.triangle.2.circlepath"
+        case .compress: "arrow.down.right.and.arrow.up.left"
+        case .upscale: "arrow.up.left.and.arrow.down.right"
+        }
+    }
+    /// Past participle used in summaries and notifications.
+    var doneLabel: String {
+        switch self {
+        case .convert: "Conversion terminée"
+        case .compress: "Compression terminée"
+        case .upscale: "Agrandissement terminé"
+        }
+    }
 }
 
 struct WatchedFolder: Codable, Equatable, Identifiable, Sendable {
@@ -490,8 +511,15 @@ struct ProcessingSnapshot: Codable, Equatable, Sendable {
     var mappings: [FormatMapping] = []
     var compressWhileConverting = false
     var compressAfterConverting = false
+    var upscaleTarget = "SAME"          // "SAME" keeps the original format when it can be written losslessly enough
 
     func target(for url: URL, kind: MediaKind, mode: ProcessMode) -> FormatDescriptor? {
+        if mode == .upscale {
+            guard kind == .image else { return nil }
+            if upscaleTarget != "SAME", let f = FormatCatalog.format(upscaleTarget) { return f }
+            if let f = FileDetection.sameFormat(for: url), f.kind == .image, Self.upscaleKeepable.contains(f.id) { return f }
+            return FormatCatalog.format("PNG")
+        }
         if mode == .compress {
             if kind == .audio, let f = FormatDescriptor.audioCompressTarget(for: url, codec: audio.compressCodec) { return f }
             return FileDetection.sameFormat(for: url) ?? (kind == .document ? FormatCatalog.format("PDF") : nil)
@@ -504,6 +532,12 @@ struct ProcessingSnapshot: Codable, Equatable, Sendable {
         case .audio: return FormatCatalog.format(audioTarget)
         }
     }
+}
+
+extension ProcessingSnapshot {
+    /// Formats an upscaled image may keep (raster, single image, good quality writer). Others become PNG.
+    static let upscaleKeepable: Set<String> = ["JPEG", "PNG", "HEIC", "TIFF", "WEBP", "AVIF", "JXL", "JP2", "BMP", "PSD", "TGA"]
+    static let upscaleChoices = ["SAME", "PNG", "HEIC", "JPEG", "TIFF", "WEBP", "AVIF", "JXL"]
 }
 
 extension FormatDescriptor {

@@ -8,6 +8,7 @@ import AppKit
 struct ProducedFile: Sendable {
     var url: URL
     var suffix: String?
+    var aiUpscaled: Bool? = nil     // set by the upscale mode (false = Lanczos fallback)
 }
 
 /// Image pipeline. Native ImageIO / CoreGraphics first (hardware-accelerated decode, downsampled thumbnails,
@@ -29,6 +30,7 @@ enum ImageEngine {
     static func process(_ job: Job, progress: @escaping Progress) async throws -> [ProducedFile] {
         try Task.checkCancellation()
         let fmt = job.format
+        if job.mode == .upscale { return [try await upscale(job, progress: progress)] }
 
         // ---- Documents & vector sources -------------------------------------------------
         switch job.inputClass {
@@ -67,6 +69,43 @@ enum ImageEngine {
         let produced = try await encodeImage(decoded.image, sourceProps: decoded.props, job: job, suffix: nil)
         progress(0.75)
         return [try await postOptimize(produced, job: job)]
+    }
+
+    // MARK: Upscale ×2 (AI super-resolution)
+
+    /// Full-resolution decode (oriented) → AI ×2 → colour/alpha render → high-quality encode.
+    /// Resize and watermark settings are ignored here: this mode exists to enlarge.
+    static func upscale(_ job: Job, progress: @escaping Progress) async throws -> ProducedFile {
+        var job = job
+        job.settings.resizeMode = .none
+        job.settings.watermark.enabled = false
+        job.compress = false
+        job.settings.targetFileSizeKB = nil
+        progress(0.03)
+
+        // Decode at full size (vector/PDF/exotic sources go through the usual intermediate).
+        guard let decoded = try await decodeToNativeImage(job) else {
+            throw ToolError("Impossible de lire l'image. Elle est peut-être corrompue ou dans un format non pris en charge.")
+        }
+        try Task.checkCancellation()
+        progress(0.08)
+        let result = try await Upscaler.upscale2x(decoded.image) { p in progress(0.08 + p * 0.8) }
+        try Task.checkCancellation()
+
+        // Colour-space conversion / alpha flattening for the output format, at the new size.
+        let target = TargetSize(canvasW: result.image.width, canvasH: result.image.height,
+                                drawW: result.image.width, drawH: result.image.height, padded: false)
+        let rendered = try render(result.image, settings: job.settings, format: job.format, target: target)
+        var props = decoded.props
+        props[kCGImagePropertyOrientation] = 1   // pixels are already upright
+        if let dpi = props[kCGImagePropertyDPIWidth] as? Double, job.settings.dpi == nil {   // same print size, twice the detail
+            props[kCGImagePropertyDPIWidth] = dpi * 2
+            props[kCGImagePropertyDPIHeight] = (props[kCGImagePropertyDPIHeight] as? Double ?? dpi) * 2
+        }
+        progress(0.9)
+        var produced = try await encodeImage(rendered, sourceProps: props, job: job, suffix: nil)
+        produced.aiUpscaled = result.ai
+        return produced
     }
 
     // MARK: Decode
@@ -309,7 +348,8 @@ enum ImageEngine {
     // MARK: Encode
 
     static func effectiveQuality(_ job: Job) -> Int {
-        job.compress ? job.settings.quality() : max(job.settings.quality(), 90)
+        if job.mode == .upscale { return max(job.settings.quality(), 95) }
+        return job.compress ? job.settings.quality() : max(job.settings.quality(), 90)
     }
 
     /// Encodes a CGImage into the job's output format. Native writers run inline; external

@@ -62,7 +62,9 @@ struct BottomBar: View {
     @ViewBuilder private var targets: some View {
         @Bindable var store = store
         HStack(spacing: 8) {
-            if model.mode == .convert {
+            if model.mode == .upscale {
+                UpscaleControls()
+            } else if model.mode == .convert {
                 ForEach(kinds, id: \.self) { kind in
                     TargetButton(kind: kind, selection: binding(for: kind))
                 }
@@ -139,7 +141,7 @@ struct BottomBar: View {
                 .tint(.red)
             } else {
                 Button { model.start() } label: {
-                    Label(model.mode == .convert ? "Convertir" : "Compresser", systemImage: model.mode.symbol)
+                    Label(model.mode.label, systemImage: model.mode.symbol)
                         .frame(minWidth: 110)
                 }
                 .buttonStyle(.glassProminent)

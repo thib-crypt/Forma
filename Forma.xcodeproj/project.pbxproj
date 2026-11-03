@@ -27,6 +27,8 @@
 		A86083BCE84EA98CF45D2AE5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 85A04D740D98F94AF8D1C01A /* Assets.xcassets */; };
 		AC5EDD85A73A52587F6E48A2 /* FileListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 159847073BFDC3AF7233FCB1 /* FileListView.swift */; };
 		D2B20539A265C9024F6D761A /* CLI.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4FE13BCD7CFAB0EF231AEEC /* CLI.swift */; };
+		D77E8D4EE145F7F3D117F65E /* UpscaleViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6440F692F2D66C0160DBA7D9 /* UpscaleViews.swift */; };
+		F937CA317265E62AEC45049F /* Upscaler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BD6618ED7A56DF61166678A /* Upscaler.swift */; };
 		FDD214C31D065FE99D3A920F /* Formats.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FE80EE95F1B0B002C727FB2 /* Formats.swift */; };
 /* End PBXBuildFile section */
 
@@ -42,11 +44,13 @@
 		388BAF323CB391F4DC0B2C87 /* MediaEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaEngine.swift; sourceTree = "<group>"; };
 		3BF36FB005541C2F15D619FE /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		463DBA3F222B72835A9C0495 /* FormaApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormaApp.swift; sourceTree = "<group>"; };
+		6440F692F2D66C0160DBA7D9 /* UpscaleViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpscaleViews.swift; sourceTree = "<group>"; };
 		71EDD8B35978D30E8746D2B4 /* Output.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Output.swift; sourceTree = "<group>"; };
 		7B95842B20C472272AE86999 /* Intents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Intents.swift; sourceTree = "<group>"; };
 		85A04D740D98F94AF8D1C01A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		8E17785C05FAFCA9736B3323 /* DocumentEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentEngine.swift; sourceTree = "<group>"; };
 		932CEF1A72D61C7D3C33815D /* ImageEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageEngine.swift; sourceTree = "<group>"; };
+		9BD6618ED7A56DF61166678A /* Upscaler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Upscaler.swift; sourceTree = "<group>"; };
 		B40B7741A7A02574793B7425 /* Services.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services.swift; sourceTree = "<group>"; };
 		BD12C80A08799BD975B118A2 /* Tools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tools.swift; sourceTree = "<group>"; };
 		BF34CCB99D9E24FBD72E8FF3 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -99,6 +103,7 @@
 				E3DDE14A7C02E4B77132F1EA /* MainView.swift */,
 				21515917D5FCE254149CC148 /* MenuBarView.swift */,
 				3BF36FB005541C2F15D619FE /* SettingsView.swift */,
+				6440F692F2D66C0160DBA7D9 /* UpscaleViews.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -126,6 +131,7 @@
 				932CEF1A72D61C7D3C33815D /* ImageEngine.swift */,
 				388BAF323CB391F4DC0B2C87 /* MediaEngine.swift */,
 				33232C90819E6E7F839D2CFC /* Pipeline.swift */,
+				9BD6618ED7A56DF61166678A /* Upscaler.swift */,
 			);
 			path = Engines;
 			sourceTree = "<group>";
@@ -257,6 +263,8 @@
 				05B93CC417A97CE4A8239A9E /* Settings.swift in Sources */,
 				9F4EB9675CCD63650B0BE81B /* SettingsView.swift in Sources */,
 				1E902E332E32617D8A7F638F /* Tools.swift in Sources */,
+				D77E8D4EE145F7F3D117F65E /* UpscaleViews.swift in Sources */,
+				F937CA317265E62AEC45049F /* Upscaler.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -401,7 +409,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.thibault.forma;
 				PRODUCT_NAME = Forma;
 				SDKROOT = macosx;
@@ -429,7 +437,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.thibault.forma;
 				PRODUCT_NAME = Forma;
 				SDKROOT = macosx;

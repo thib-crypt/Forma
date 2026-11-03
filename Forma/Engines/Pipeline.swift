@@ -17,10 +17,12 @@ enum Pipeline {
         guard fm.fileExists(atPath: input.path) else { throw ToolError("Le fichier n'existe plus. Il a peut-être été déplacé ou supprimé.") }
         let cls = FileDetection.classify(input)
         guard let kind = cls.mediaKind else { throw ToolError("Ce format n'est pas pris en charge.") }
+        if mode == .upscale && kind != .image { throw ToolError("L'agrandissement IA concerne uniquement les images.") }
         guard let format = targetOverride ?? snapshot.target(for: input, kind: kind, mode: mode) else {
             throw ToolError(mode == .compress ? "Compression non prise en charge pour ce format." : "Choisissez un format de sortie.")
         }
-        let compress = mode == .compress || snapshot.compressWhileConverting
+        if mode == .upscale && format.kind != .image { throw ToolError("Choisissez un format d'image en sortie.") }
+        let compress = mode == .compress || (mode == .convert && snapshot.compressWhileConverting)
         let near = outputFolder ?? input.deletingLastPathComponent()
         let originalSize = input.fileSize
 
@@ -85,7 +87,9 @@ enum Pipeline {
             }
         }
         let total = finals.reduce(Int64(0)) { $0 + $1.fileSize }
-        return PipelineResult(outputs: finals, outputSize: total, note: finals.count > 1 ? "\(finals.count) pages" : nil)
+        let note: String? = finals.count > 1 ? "\(finals.count) pages"
+            : produced.first?.aiUpscaled == false ? "Agrandi sans IA (Lanczos)" : nil
+        return PipelineResult(outputs: finals, outputSize: total, note: note)
     }
 
     /// Expands folders into supported files (optionally recursive), skipping hidden files and packages.

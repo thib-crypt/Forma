@@ -36,8 +36,8 @@ struct MainView: View {
                 }
                 .pickerStyle(.segmented)
                 .labelStyle(.titleAndIcon)
-                .frame(width: 280)
-                .help("⌘1 Convertir · ⌘2 Compresser")
+                .frame(width: 400)
+                .help("⌘1 Convertir · ⌘2 Compresser · ⌘3 Agrandir")
             }
             ToolbarItemGroup(placement: .primaryAction) {
                 Button { AddPanel.present() } label: { Label("Ajouter", systemImage: "plus") }
@@ -56,11 +56,19 @@ struct DropZoneView: View {
     @Environment(AppModel.self) private var model
     var targeted: Bool
 
+    private var subtitle: String {
+        switch model.mode {
+        case .convert: "Images, vidéos, audio, PDF et RAW — plus de 130 formats, 100 % en local."
+        case .compress: "Réduisez le poids sans perte visible. Les originaux ne sont jamais modifiés par défaut."
+        case .upscale: "Doublez la définition de vos images grâce à la super-résolution IA d'Apple,\nexécutée sur le Neural Engine — détails nets, sans halo, 100 % en local."
+        }
+    }
+
     var body: some View {
         VStack(spacing: 22) {
             ZStack {
                 Circle().fill(.tint.opacity(targeted ? 0.22 : 0.12)).frame(width: 128, height: 128)
-                Image(systemName: model.mode == .convert ? "arrow.triangle.2.circlepath" : "arrow.down.right.and.arrow.up.left")
+                Image(systemName: model.mode == .upscale ? "sparkles" : model.mode.symbol)
                     .font(.system(size: 50, weight: .medium))
                     .foregroundStyle(.tint)
                     .symbolEffect(.bounce, value: targeted)
@@ -68,11 +76,10 @@ struct DropZoneView: View {
             VStack(spacing: 6) {
                 Text(targeted ? "Relâchez pour ajouter" : "Déposez vos fichiers ici")
                     .font(.system(size: 26, weight: .semibold, design: .rounded))
-                Text(model.mode == .convert
-                     ? "Images, vidéos, audio, PDF et RAW — plus de 130 formats, 100 % en local."
-                     : "Réduisez le poids sans perte visible. Les originaux ne sont jamais modifiés par défaut.")
+                Text(subtitle)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
+                if model.mode == .upscale { UpscaleModelRow().padding(.top, 4) }
             }
             Button { AddPanel.present() } label: {
                 Label("Ajouter des fichiers ou dossiers…", systemImage: "plus")
@@ -82,7 +89,7 @@ struct DropZoneView: View {
             .controlSize(.large)
 
             HStack(spacing: 10) {
-                ForEach(MediaKind.allCases) { k in
+                ForEach(model.mode == .upscale ? [MediaKind.image] : MediaKind.allCases) { k in
                     Label(k.label, systemImage: k.symbol)
                         .font(.callout)
                         .padding(.horizontal, 12).padding(.vertical, 6)

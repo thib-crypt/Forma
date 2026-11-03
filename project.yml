@@ -60,12 +60,17 @@ targets:
             NSPortName: Forma
             NSRequiredContext: {}
             NSSendFileTypes: [public.item]
+          - NSMenuItem: { default: "Forma — Agrandir ×2 (IA)" }
+            NSMessage: upscaleFiles
+            NSPortName: Forma
+            NSRequiredContext: {}
+            NSSendFileTypes: [public.image]
     settings:
       base:
         PRODUCT_NAME: Forma
         PRODUCT_BUNDLE_IDENTIFIER: com.thibault.forma
         SWIFT_VERSION: "5.0"
-        MARKETING_VERSION: "1.0"
+        MARKETING_VERSION: "1.1"
         CURRENT_PROJECT_VERSION: "1"
         GENERATE_INFOPLIST_FILE: NO
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

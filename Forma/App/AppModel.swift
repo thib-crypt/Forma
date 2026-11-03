@@ -1,5 +1,6 @@
 import Foundation
 import AppKit
+import ImageIO
 import QuickLookThumbnailing
 import UniformTypeIdentifiers
 
@@ -28,6 +29,7 @@ final class FileItem: Identifiable {
     var outputs: [URL] = []
     var outputSize: Int64 = 0
     var note: String?
+    var resolutionBadge: String?       // upscale mode: "3000 × 2000" instead of a size delta
     var targetOverride: String?        // per-file output format
     var thumbnail: NSImage?
     var startedAt: Date?
@@ -65,6 +67,7 @@ final class AppModel {
     }
     var convertItems: [FileItem] = []
     var compressItems: [FileItem] = []
+    var upscaleItems: [FileItem] = []
     var isRunning = false
     var isPaused = false
     var runningMode: ProcessMode?
@@ -84,11 +87,21 @@ final class AppModel {
         set { PreferencesStore.shared.prefs = newValue }
     }
 
-    func items(for mode: ProcessMode) -> [FileItem] { mode == .convert ? convertItems : compressItems }
+    func items(for mode: ProcessMode) -> [FileItem] {
+        switch mode {
+        case .convert: convertItems
+        case .compress: compressItems
+        case .upscale: upscaleItems
+        }
+    }
     var items: [FileItem] { items(for: mode) }
 
     private func setItems(_ list: [FileItem], for mode: ProcessMode) {
-        if mode == .convert { convertItems = list } else { compressItems = list }
+        switch mode {
+        case .convert: convertItems = list
+        case .compress: compressItems = list
+        case .upscale: upscaleItems = list
+        }
     }
 
     // MARK: Adding
@@ -98,12 +111,14 @@ final class AppModel {
         let m = mode ?? self.mode
         if let mode { self.mode = mode }
         let existing = Set(items(for: m).map(\.url))
-        let files = Pipeline.expand(urls).filter { !existing.contains($0) }
+        let files = Pipeline.expand(urls).filter {
+            !existing.contains($0) && (m != .upscale || FileDetection.classify($0).mediaKind == .image)
+        }
         guard !files.isEmpty else { return 0 }
         let new = files.map(FileItem.init)
         setItems(items(for: m) + new, for: m)
         new.forEach(loadThumbnail)
-        let shouldStart = autoStart ?? (m == .compress && prefs.autoStartOnDrop)
+        let shouldStart = autoStart ?? (m != .convert && prefs.autoStartOnDrop)
         if shouldStart { start(mode: m) }
         return new.count
     }
@@ -130,7 +145,8 @@ final class AppModel {
         runningMode = m
         lastBatchSummary = nil
         let snap = snapshot ?? prefs.processing
-        let imageWidth = SystemInfo.imageParallelism(requested: prefs.maxParallelImages)
+        // Upscaling is bound by the Neural Engine (one tile at a time): 2 lanes overlap decode/encode with inference.
+        let imageWidth = m == .upscale ? 2 : SystemInfo.imageParallelism(requested: prefs.maxParallelImages)
         let mediaWidth = max(1, prefs.maxParallelVideos)
 
         runTask = Task { [weak self] in
@@ -178,6 +194,7 @@ final class AppModel {
             item.outputs = result.outputs
             item.outputSize = result.outputSize
             item.note = result.note
+            if mode == .upscale, let out = result.outputs.first { item.resolutionBadge = Self.pixelSize(of: out) }
             item.status = result.skipped ? .skipped(result.note ?? "Ignoré") : .done
         } catch is CancellationError {
             item.status = .cancelled
@@ -212,9 +229,16 @@ final class AppModel {
             NSWorkspace.shared.activateFileViewerSelecting(outputs)
         }
         if prefs.notifyWhenDone, !NSApp.isActive {
-            Notifier.post(title: mode == .convert ? "Conversion terminée" : "Compression terminée", body: summary)
+            Notifier.post(title: mode.doneLabel, body: summary)
         }
         if !NSApp.isActive { NSApp.requestUserAttention(.informationalRequest) }
+    }
+
+    nonisolated static func pixelSize(of url: URL) -> String? {
+        guard let src = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let p = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any],
+              let w = p[kCGImagePropertyPixelWidth] as? Int, let h = p[kCGImagePropertyPixelHeight] as? Int else { return nil }
+        return "\(w) × \(h)"
     }
 
     static func format(_ t: TimeInterval) -> String {
@@ -262,6 +286,7 @@ final class AppModel {
         item.outputs = []
         item.outputSize = 0
         item.note = nil
+        item.resolutionBadge = nil
     }
 
     func retryFailed() {

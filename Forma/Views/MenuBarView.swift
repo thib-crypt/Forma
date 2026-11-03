@@ -16,7 +16,7 @@ struct MenuBarView: View {
                     ForEach(ProcessMode.allCases) { Text($0.label).tag($0) }
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 190)
+                .frame(width: 250)
             }
 
             VStack(spacing: 6) {
@@ -25,7 +25,8 @@ struct MenuBarView: View {
                     .foregroundStyle(.tint)
                 Text(dropMode == .convert
                      ? "Déposez pour convertir (\(FormatCatalog.format(store.prefs.processing.imageTarget)?.name ?? "") / \(FormatCatalog.format(store.prefs.processing.videoTarget)?.name ?? ""))"
-                     : "Déposez pour compresser (\(store.prefs.processing.image.preset.label))")
+                     : dropMode == .compress ? "Déposez pour compresser (\(store.prefs.processing.image.preset.label))"
+                     : "Déposez des images pour les agrandir ×2 (IA)")
                     .font(.callout)
                     .multilineTextAlignment(.center)
             }

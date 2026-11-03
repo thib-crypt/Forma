@@ -116,11 +116,37 @@ struct CompressFilesIntent: AppIntent {
     }
 }
 
+struct UpscaleImagesIntent: AppIntent {
+    static let title: LocalizedStringResource = "Agrandir des images ×2"
+    static let description = IntentDescription("Double la définition des images par super-résolution IA, sur le Neural Engine, avec Forma.")
+    static let openAppWhenRun = false
+
+    @Parameter(title: "Images", supportedContentTypes: [.image])
+    var files: [IntentFile]
+
+    @Parameter(title: "Format de sortie", description: "Laisser vide pour garder le format d'origine.", optionsProvider: FormatOptionsProvider())
+    var format: String?
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("Agrandir \(\.$files) ×2") { \.$format }
+    }
+
+    func perform() async throws -> some IntentResult & ReturnsValue<[IntentFile]> {
+        var snap = PreferencesStore.loadSnapshot().processing
+        snap.output.replaceOriginals = false
+        let target = format.flatMap(FormatCatalog.resolve).flatMap { $0.kind == .image ? $0 : nil }
+        let result = try await IntentRunner.run(try IntentRunner.urls(from: files), mode: .upscale, snapshot: snap, target: target)
+        return .result(value: result)
+    }
+}
+
 struct FormaShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(intent: ConvertFilesIntent(), phrases: ["Convertir avec \(.applicationName)", "Convert files with \(.applicationName)"],
                     shortTitle: "Convertir", systemImageName: "arrow.triangle.2.circlepath")
         AppShortcut(intent: CompressFilesIntent(), phrases: ["Compresser avec \(.applicationName)", "Compress files with \(.applicationName)"],
                     shortTitle: "Compresser", systemImageName: "arrow.down.right.and.arrow.up.left")
+        AppShortcut(intent: UpscaleImagesIntent(), phrases: ["Agrandir avec \(.applicationName)", "Upscale images with \(.applicationName)"],
+                    shortTitle: "Agrandir ×2", systemImageName: "sparkles")
     }
 }
