@@ -18,6 +18,11 @@ struct FileListView: View {
         .listStyle(.inset)
         .scrollContentBackground(.hidden)
         .onDeleteCommand { model.remove(model.selection) }
+        .onKeyPress(.space) {
+            guard let item = model.items.first(where: { model.selection.contains($0.id) }) else { return .ignored }
+            PreviewWindow.open(item, mode: model.mode)
+            return .handled
+        }
         .contextMenu(forSelectionType: FileItem.ID.self) { ids in
             if !ids.isEmpty {
                 Button("Retirer de la liste") { model.remove(ids) }
@@ -34,6 +39,7 @@ struct FileRow: View {
     @Environment(PreferencesStore.self) private var store
     let item: FileItem
     @State private var showInfo = false
+    @State private var hovering = false
 
     private var target: FormatDescriptor? {
         if let o = item.targetOverride { return FormatCatalog.format(o) }
@@ -69,6 +75,15 @@ struct FileRow: View {
             }
             Spacer(minLength: 8)
 
+            if hovering, PreviewRenderer.canPreview(item.kind), !item.status.isProcessing {
+                Button { PreviewWindow.open(item, mode: model.mode) } label: {
+                    Image(systemName: "eye").padding(4)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .help(item.status == .done ? "Comparer avant / après (Espace)" : "Aperçu avec les réglages actuels (Espace)")
+                .transition(.opacity)
+            }
             if model.mode == .convert, item.status == .pending || item.status == .cancelled {
                 FormatOverrideMenu(item: item)
             }
@@ -79,6 +94,7 @@ struct FileRow: View {
         .padding(.horizontal, 6)
         .contentShape(Rectangle())
         .popover(isPresented: $showInfo) { MetadataView(url: item.url) }
+        .onHover { h in withAnimation(.easeOut(duration: 0.12)) { hovering = h } }
         .onTapGesture(count: 2) {
             if let out = item.outputs.first { NSWorkspace.shared.activateFileViewerSelecting([out]) }
         }
@@ -177,8 +193,12 @@ struct FileContextMenu: View {
         if let out = item.outputs.first {
             Button("Afficher le résultat dans le Finder") { NSWorkspace.shared.activateFileViewerSelecting(item.outputs) }
             Button("Ouvrir le résultat") { NSWorkspace.shared.open(out) }
-            if item.kind == .image {
-                Button("Comparer avant / après") { model.compareItem = item }
+            if PreviewRenderer.canPreview(item.kind) {
+                Button("Comparer avant / après") { PreviewWindow.open(item, mode: model.mode) }
+            }
+            if let e = HistoryModel.shared.entry(item.historyID), !e.isUndone {
+                Button("Annuler ce traitement") { Toast.show(HistoryModel.shared.undo([e]), symbol: "arrow.uturn.backward") }
+                    .disabled(HistoryUndo.blocker(for: e) != nil)
             }
             Button("Copier le résultat") {
                 NSPasteboard.general.clearContents()
@@ -186,8 +206,12 @@ struct FileContextMenu: View {
             }
             Divider()
         }
+        if item.outputs.isEmpty, PreviewRenderer.canPreview(item.kind), !item.status.isProcessing {
+            Button("Aperçu avec les réglages actuels") { PreviewWindow.open(item, mode: model.mode) }
+            Divider()
+        }
         Button("Afficher l'original dans le Finder") { NSWorkspace.shared.activateFileViewerSelecting([item.url]) }
-        Button("Infos & métadonnées") { model.compareItem = nil; MetadataWindow.show(item.url) }
+        Button("Infos & métadonnées") { MetadataWindow.show(item.url) }
         Divider()
         if item.status.isFinished {
             Button("Retraiter") { model.reset(item) }

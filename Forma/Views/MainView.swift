@@ -5,6 +5,7 @@ struct MainView: View {
     @Environment(AppModel.self) private var model
     @Environment(PreferencesStore.self) private var store
     @State private var dropTargeted = false
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         @Bindable var model = model
@@ -42,11 +43,12 @@ struct MainView: View {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button { AddPanel.present() } label: { Label("Ajouter", systemImage: "plus") }
                     .help("Ajouter des fichiers ou dossiers (⌘O)")
+                Button { openWindow(id: "history") } label: { Label("Historique", systemImage: "clock.arrow.circlepath") }
+                    .help("Historique des traitements, avec annulation (⌘Y)")
                 SettingsLink { Label("Réglages", systemImage: "gearshape") }
             }
         }
         .navigationTitle("")
-        .sheet(item: $model.compareItem) { CompareView(item: $0) }
     }
 }
 
@@ -89,7 +91,7 @@ struct DropZoneView: View {
             .controlSize(.large)
 
             HStack(spacing: 10) {
-                ForEach(model.mode == .upscale ? [MediaKind.image] : MediaKind.allCases) { k in
+                ForEach(model.mode == .upscale ? [MediaKind.image] : MediaKind.visible) { k in
                     Label(k.label, systemImage: k.symbol)
                         .font(.callout)
                         .padding(.horizontal, 12).padding(.vertical, 6)

@@ -34,6 +34,7 @@ final class FileItem: Identifiable {
     var thumbnail: NSImage?
     var startedAt: Date?
     var finishedAt: Date?
+    var historyID: UUID?               // history entry of the last successful run (for undo)
 
     init(url: URL) {
         self.url = url
@@ -73,7 +74,7 @@ final class AppModel {
     var runningMode: ProcessMode?
     var selection = Set<FileItem.ID>()
     var lastBatchSummary: String?
-    var compareItem: FileItem?
+    var lastBatchID: UUID?
 
     private var runTask: Task<Void, Never>?
     private var pauseContinuations: [CheckedContinuation<Void, Never>] = []
@@ -134,7 +135,7 @@ final class AppModel {
 
     // MARK: Queue control
 
-    func start(mode: ProcessMode? = nil, snapshot: ProcessingSnapshot? = nil) {
+    func start(mode: ProcessMode? = nil, snapshot: ProcessingSnapshot? = nil, origin: HistoryOrigin = .app) {
         let m = mode ?? self.mode
         guard !isRunning else { return }
         let pending = items(for: m).filter { $0.status == .pending || $0.status == .cancelled }
@@ -145,6 +146,8 @@ final class AppModel {
         runningMode = m
         lastBatchSummary = nil
         let snap = snapshot ?? prefs.processing
+        let batch = UUID()
+        lastBatchID = batch
         // Upscaling is bound by the Neural Engine (one tile at a time): 2 lanes overlap decode/encode with inference.
         let imageWidth = m == .upscale ? 2 : SystemInfo.imageParallelism(requested: prefs.maxParallelImages)
         let mediaWidth = max(1, prefs.maxParallelVideos)
@@ -152,24 +155,25 @@ final class AppModel {
         runTask = Task { [weak self] in
             guard let self else { return }
             let started = Date()
-            let images = pending.filter { $0.kind == .image || $0.kind == .document }
+            let images = pending.filter { $0.kind == .image || $0.kind == .document || $0.kind == .office }
             let media = pending.filter { $0.kind == .video || $0.kind == .audio }
             await withTaskGroup(of: Void.self) { group in
-                group.addTask { await self.lane(images, width: imageWidth, mode: m, snapshot: snap) }
-                group.addTask { await self.lane(media, width: mediaWidth, mode: m, snapshot: snap) }
+                group.addTask { await self.lane(images, width: imageWidth, mode: m, snapshot: snap, origin: origin, batch: batch) }
+                group.addTask { await self.lane(media, width: mediaWidth, mode: m, snapshot: snap, origin: origin, batch: batch) }
             }
             self.finishBatch(pending, mode: m, elapsed: Date().timeIntervalSince(started))
         }
     }
 
-    private func lane(_ items: [FileItem], width: Int, mode: ProcessMode, snapshot: ProcessingSnapshot) async {
+    private func lane(_ items: [FileItem], width: Int, mode: ProcessMode, snapshot: ProcessingSnapshot,
+                      origin: HistoryOrigin, batch: UUID) async {
         guard !items.isEmpty else { return }
         var iterator = items.enumerated().makeIterator()
         await withTaskGroup(of: Void.self) { group in
             func enqueueNext() async -> Bool {
                 await self.waitIfPaused()
                 guard !Task.isCancelled, let (i, item) = iterator.next() else { return false }
-                group.addTask { await self.process(item, index: i + 1, mode: mode, snapshot: snapshot) }
+                group.addTask { await self.process(item, index: i + 1, mode: mode, snapshot: snapshot, origin: origin, batch: batch) }
                 return true
             }
             for _ in 0..<width { if !(await enqueueNext()) { break } }
@@ -179,7 +183,8 @@ final class AppModel {
         }
     }
 
-    private func process(_ item: FileItem, index: Int, mode: ProcessMode, snapshot: ProcessingSnapshot) async {
+    private func process(_ item: FileItem, index: Int, mode: ProcessMode, snapshot: ProcessingSnapshot,
+                         origin: HistoryOrigin, batch: UUID) async {
         if Task.isCancelled { item.status = .cancelled; return }
         item.status = .processing(0.02)
         item.startedAt = Date()
@@ -187,13 +192,15 @@ final class AppModel {
         let override = item.targetOverride.flatMap(FormatCatalog.format)
         let throttle = ProgressThrottle()
         do {
-            let result = try await Pipeline.run(input: url, mode: mode, snapshot: snapshot, index: index, targetOverride: override) { p in
+            let result = try await Pipeline.run(input: url, mode: mode, snapshot: snapshot, index: index, targetOverride: override,
+                                                origin: origin, batch: batch) { p in
                 guard throttle.shouldEmit(p) else { return }
                 Task { @MainActor in if case .processing = item.status { item.status = .processing(max(0.02, p)) } }
             }
             item.outputs = result.outputs
             item.outputSize = result.outputSize
             item.note = result.note
+            item.historyID = result.historyID
             if mode == .upscale, let out = result.outputs.first { item.resolutionBadge = Self.pixelSize(of: out) }
             item.status = result.skipped ? .skipped(result.note ?? "Ignoré") : .done
         } catch is CancellationError {
@@ -287,6 +294,15 @@ final class AppModel {
         item.outputSize = 0
         item.note = nil
         item.resolutionBadge = nil
+        item.historyID = nil
+    }
+
+    /// Called after history entries were undone: matching rows go back to "pending" so they can be re-tuned and rerun.
+    func didUndo(_ ids: Set<UUID>) {
+        for list in [convertItems, compressItems, upscaleItems] {
+            for item in list where item.historyID.map(ids.contains) == true { reset(item) }
+        }
+        lastBatchSummary = nil
     }
 
     func retryFailed() {

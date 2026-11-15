@@ -34,8 +34,9 @@ enum IntentRunner {
 
     static func run(_ urls: [URL], mode: ProcessMode, snapshot: ProcessingSnapshot, target: FormatDescriptor?) async throws -> [IntentFile] {
         var out: [IntentFile] = []
+        let batch = UUID()
         for (i, u) in Pipeline.expand(urls).enumerated() {
-            let r = try await Pipeline.run(input: u, mode: mode, snapshot: snapshot, index: i + 1, targetOverride: target) { _ in }
+            let r = try await Pipeline.run(input: u, mode: mode, snapshot: snapshot, index: i + 1, targetOverride: target, origin: .shortcut, batch: batch) { _ in }
             let files = r.outputs.isEmpty ? [u] : r.outputs
             out += files.map { IntentFile(fileURL: $0, filename: $0.lastPathComponent, type: UTType(filenameExtension: $0.pathExtension)) }
         }

@@ -3,7 +3,7 @@ import Foundation
 /// External engines. Everything native (ImageIO, VideoToolbox through ffmpeg, PDFKit) is used first;
 /// these binaries only cover formats macOS can't write on its own.
 enum Tool: String, CaseIterable, Sendable {
-    case magick, ffmpeg, ffprobe, gs, cwebp, gif2webp, cjxl, mozjpeg, pngquant, oxipng, gifsicle
+    case magick, ffmpeg, ffprobe, gs, cwebp, gif2webp, cjxl, mozjpeg, pngquant, oxipng, gifsicle, pandoc, soffice
 
     var label: String {
         switch self {
@@ -18,6 +18,8 @@ enum Tool: String, CaseIterable, Sendable {
         case .pngquant: "pngquant"
         case .oxipng: "oxipng"
         case .gifsicle: "gifsicle"
+        case .pandoc: "Pandoc"
+        case .soffice: "LibreOffice"
         }
     }
     var purpose: String {
@@ -33,6 +35,8 @@ enum Tool: String, CaseIterable, Sendable {
         case .pngquant: "PNG avec perte (-60 à -80 %)"
         case .oxipng: "PNG sans perte optimisés"
         case .gifsicle: "GIF optimisés"
+        case .pandoc: "Word, Markdown, EPUB, LaTeX…"
+        case .soffice: "Mise en page Office fidèle, Excel, PowerPoint"
         }
     }
     var brewFormula: String {
@@ -43,12 +47,15 @@ enum Tool: String, CaseIterable, Sendable {
         case .cwebp, .gif2webp: "webp"
         case .cjxl: "jpeg-xl"
         case .mozjpeg: "mozjpeg"
+        case .soffice: "--cask libreoffice"
         default: rawValue
         }
     }
     private var candidates: [String] {
         switch self {
         case .mozjpeg: ["/opt/homebrew/opt/mozjpeg/bin/cjpeg", "/usr/local/opt/mozjpeg/bin/cjpeg"]
+        case .soffice: ["/Applications/LibreOffice.app/Contents/MacOS/soffice", "\(NSHomeDirectory())/Applications/LibreOffice.app/Contents/MacOS/soffice",
+                        "/opt/homebrew/bin/soffice", "/usr/local/bin/soffice"]
         default: ["/opt/homebrew/bin/\(rawValue)", "/usr/local/bin/\(rawValue)", "/opt/local/bin/\(rawValue)"]
         }
     }
@@ -84,11 +91,13 @@ enum ProcessRunner {
                     _ arguments: [String],
                     environment: [String: String]? = nil,
                     stdin: Data? = nil,
+                    cwd: URL? = nil,
                     timeout: TimeInterval = 3600,
                     onLine: (@Sendable (String) -> Void)? = nil) async throws -> Result {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
+        if let cwd { process.currentDirectoryURL = cwd }
         var env = ProcessInfo.processInfo.environment
         env["PATH"] = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:" + (env["PATH"] ?? "")
         environment?.forEach { env[$0] = $1 }
@@ -186,12 +195,12 @@ enum ProcessRunner {
 
     /// Runs and throws a readable error when the exit status is non-zero.
     @discardableResult
-    static func check(_ tool: Tool, _ arguments: [String], stdin: Data? = nil, timeout: TimeInterval = 3600,
+    static func check(_ tool: Tool, _ arguments: [String], stdin: Data? = nil, cwd: URL? = nil, timeout: TimeInterval = 3600,
                       onLine: (@Sendable (String) -> Void)? = nil) async throws -> Result {
         guard let path = tool.path else {
             throw ToolError("\(tool.label) n'est pas installé — `brew install \(tool.brewFormula)`")
         }
-        let r = try await run(path, arguments, stdin: stdin, timeout: timeout, onLine: onLine)
+        let r = try await run(path, arguments, stdin: stdin, cwd: cwd, timeout: timeout, onLine: onLine)
         try Task.checkCancellation()
         guard r.status == 0 else {
             throw ToolError(Self.humanize(tool: tool, stderr: r.stderr, status: r.status))

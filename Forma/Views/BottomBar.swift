@@ -8,7 +8,7 @@ struct BottomBar: View {
 
     private var kinds: [MediaKind] {
         let present = Set(model.items.map { $0.kind == .document ? .image : $0.kind })
-        return [.image, .video, .audio].filter(present.contains)
+        return MediaKind.visible.filter(present.contains)
     }
 
     var body: some View {
@@ -44,7 +44,19 @@ struct BottomBar: View {
             Text("\(model.items.count) fichier\(model.items.count > 1 ? "s" : "") · \(total.formattedBytes)")
                 .font(.system(size: 12, weight: .semibold))
             if let s = model.lastBatchSummary, !model.isRunning {
-                Text(s).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
+                HStack(spacing: 8) {
+                    Text(s).font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1)
+                    let undoable = HistoryModel.shared.entries.filter { $0.batch == model.lastBatchID && !$0.isUndone }
+                    if !undoable.isEmpty {
+                        Button {
+                            Toast.show(HistoryModel.shared.undo(undoable), symbol: "arrow.uturn.backward")
+                        } label: {
+                            Label("Annuler", systemImage: "arrow.uturn.backward").font(.system(size: 11, weight: .medium))
+                        }
+                        .buttonStyle(.link)
+                        .help("Met les résultats de ce lot à la Corbeille et restaure les originaux (⌥⌘Z)")
+                    }
+                }
             } else if model.isRunning {
                 Text(model.isPaused ? "En pause — les fichiers en cours se terminent" : "\(model.doneCount) / \(model.items.count) traités")
                     .font(.system(size: 11)).foregroundStyle(.secondary)
@@ -89,7 +101,14 @@ struct BottomBar: View {
                                 ForEach(AudioPreset.allCases) { p in Text("\(p.label) — \(p.detail)").tag(p) }
                             }.pickerStyle(.inline)
                         }
-                    case .document: EmptyView()
+                    case .office where !kinds.contains(.image):
+                        // Documents: the image preset drives the pictures recompressed inside DOCX / PPTX / EPUB.
+                        PresetMenu(symbol: "doc.text", title: store.prefs.processing.image.preset.label) {
+                            Picker("Images des documents", selection: $store.prefs.processing.image.preset) {
+                                ForEach(CompressionPreset.allCases) { p in Text("\(p.label) — \(p.detail)").tag(p) }
+                            }.pickerStyle(.inline)
+                        }
+                    case .document, .office: EmptyView()
                     }
                 }
             }
@@ -100,6 +119,7 @@ struct BottomBar: View {
         switch kind {
         case .video: Binding(get: { store.prefs.processing.videoTarget }, set: { store.prefs.processing.videoTarget = $0 })
         case .audio: Binding(get: { store.prefs.processing.audioTarget }, set: { store.prefs.processing.audioTarget = $0 })
+        case .office: Binding(get: { store.prefs.processing.officeTarget }, set: { store.prefs.processing.officeTarget = $0 })
         default: Binding(get: { store.prefs.processing.imageTarget }, set: { store.prefs.processing.imageTarget = $0 })
         }
     }

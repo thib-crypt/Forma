@@ -9,6 +9,7 @@ struct ProducedFile: Sendable {
     var url: URL
     var suffix: String?
     var aiUpscaled: Bool? = nil     // set by the upscale mode (false = Lanczos fallback)
+    var companion: URL? = nil       // folder placed next to the result (pictures extracted from a document)
 }
 
 /// Image pipeline. Native ImageIO / CoreGraphics first (hardware-accelerated decode, downsampled thumbnails,
@@ -446,7 +447,7 @@ enum ImageEngine {
             let out = try await DocumentEngine.imageToPostscript(png, device: device, ext: fmt.ext, near: job.near)
             return ProducedFile(url: out, suffix: suffix)
 
-        case .audio, .video:
+        case .audio, .video, .office:
             throw ToolError("Format de sortie incompatible avec une image.")
         }
     }

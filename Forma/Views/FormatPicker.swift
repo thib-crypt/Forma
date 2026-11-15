@@ -20,7 +20,8 @@ struct FormatPicker: View {
         var order: [String] = []
         var map: [String: [FormatDescriptor]] = [:]
         for f in formats {
-            let g = kind == .video && f.kind == .audio ? "Extraire l'audio" : f.group
+            let g = kind == .video && f.kind == .audio ? "Extraire l'audio"
+                : kind == .document && f.kind == .office ? "Extraire le texte" : f.group
             if map[g] == nil { order.append(g) }
             map[g, default: []].append(f)
         }
@@ -84,89 +85,6 @@ struct FormatPicker: View {
         }
         .buttonStyle(.plain)
         .help(detail)
-    }
-}
-
-// MARK: - Before / after comparison
-
-struct CompareView: View {
-    let item: FileItem
-    @Environment(\.dismiss) private var dismiss
-    @State private var split: CGFloat = 0.5
-    @State private var before: NSImage?
-    @State private var after: NSImage?
-    @State private var zoom: CGFloat = 1
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                VStack(alignment: .leading) {
-                    Text("Avant").font(.headline)
-                    Text("\(item.inputExt) · \(item.size.formattedBytes)").font(.caption).foregroundStyle(.secondary)
-                }
-                Spacer()
-                Picker("Zoom", selection: $zoom) {
-                    Text("Ajusté").tag(CGFloat(1))
-                    Text("200 %").tag(CGFloat(2))
-                    Text("400 %").tag(CGFloat(4))
-                }.pickerStyle(.segmented).frame(width: 220)
-                Spacer()
-                VStack(alignment: .trailing) {
-                    Text("Après").font(.headline)
-                    Text("\(item.outputs.first?.pathExtension.uppercased() ?? "") · \(item.outputSize.formattedBytes)\(item.savings.map { $0 > 0 ? " (−\(Int($0 * 100)) %)" : "" } ?? "")")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-            }
-            .padding()
-
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    imageView(after)
-                    imageView(before)
-                        .mask(alignment: .leading) { Rectangle().frame(width: geo.size.width * split) }
-                    Rectangle().fill(.white).frame(width: 2).shadow(radius: 3)
-                        .offset(x: geo.size.width * split - 1)
-                    Circle().fill(.white).frame(width: 28, height: 28).shadow(radius: 3)
-                        .overlay(Image(systemName: "arrow.left.and.right").font(.caption.bold()).foregroundStyle(.black))
-                        .offset(x: geo.size.width * split - 14)
-                }
-                .clipped()
-                .contentShape(Rectangle())
-                .gesture(DragGesture(minimumDistance: 0).onChanged { split = min(1, max(0, $0.location.x / geo.size.width)) })
-            }
-            .background(.black.opacity(0.85))
-
-            HStack {
-                Text("Faites glisser pour comparer").font(.caption).foregroundStyle(.secondary)
-                Spacer()
-                Button("Fermer") { dismiss() }.keyboardShortcut(.cancelAction)
-            }.padding()
-        }
-        .frame(minWidth: 820, minHeight: 620)
-        .task {
-            before = NSImage(contentsOf: item.url)
-            if let o = item.outputs.first { after = await Self.load(o) }
-        }
-    }
-
-    private func imageView(_ img: NSImage?) -> some View {
-        Group {
-            if let img {
-                Image(nsImage: img).resizable().interpolation(zoom > 1 ? .none : .high).aspectRatio(contentMode: .fit)
-                    .scaleEffect(zoom)
-            } else { ProgressView() }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    /// Formats NSImage can't open (WebP/JXL/AVIF are fine on macOS 26; others via a PNG preview).
-    static func load(_ url: URL) async -> NSImage? {
-        if let i = NSImage(contentsOf: url), i.isValid { return i }
-        guard Tool.magick.isAvailable else { return nil }
-        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".png")
-        defer { try? FileManager.default.removeItem(at: tmp) }
-        _ = try? await ProcessRunner.check(.magick, [url.path + "[0]", tmp.path])
-        return NSImage(contentsOf: tmp)
     }
 }
 

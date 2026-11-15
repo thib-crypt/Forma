@@ -32,31 +32,35 @@ struct FormaApp: App {
         .windowToolbarStyle(.unified)
         .commands { FormaCommands(model: model, store: store) }
 
+        Window("Historique", id: "history") {
+            HistoryView()
+                .environment(model)
+                .environment(store)
+                .preferredColorScheme(store.colorScheme)
+        }
+        .defaultSize(width: 820, height: 640)
+        .keyboardShortcut("y", modifiers: .command)
+        .restorationBehavior(.disabled)
+
         Settings {
             SettingsView()
                 .environment(model)
                 .environment(store)
                 .preferredColorScheme(store.colorScheme)
         }
-
-        MenuBarExtra(isInserted: Binding(get: { store.menuBarVisible }, set: { v in
-            if store.prefs.showInMenuBar != v { store.prefs.showInMenuBar = v }
-        })) {
-            MenuBarView()
-                .environment(model)
-                .environment(store)
-        } label: {
-            Image(systemName: model.isRunning ? "arrow.triangle.2.circlepath.circle.fill" : "arrow.triangle.2.circlepath.circle")
-        }
-        .menuBarExtraStyle(.window)
     }
 }
 
 /// Captures SwiftUI's openWindow so AppKit entry points (Services, Dock, CLI) can show the main window.
 private struct WindowOpenerBridge: View {
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
     var body: some View {
-        Color.clear.onAppear { AppDelegate.openMain = { openWindow(id: "main") } }
+        Color.clear.onAppear {
+            AppDelegate.openMain = { openWindow(id: "main") }
+            AppDelegate.openHistory = { openWindow(id: "history") }
+            AppDelegate.openSettingsWindow = { openSettings() }
+        }
     }
 }
 
@@ -80,6 +84,16 @@ struct FormaCommands: Commands {
                 model.isPaused ? model.resume() : model.pause()
             }.keyboardShortcut("p", modifiers: [.command, .shift]).disabled(!model.isRunning)
             Divider()
+            Button("Aperçu avant / après") {
+                if let item = model.items.first(where: { model.selection.contains($0.id) }) ?? model.items.first {
+                    PreviewWindow.open(item, mode: model.mode)
+                }
+            }
+            .disabled(model.items.isEmpty)
+            Button("Annuler le dernier traitement") { HistoryModel.shared.undoLastBatch() }
+                .keyboardShortcut("z", modifiers: [.command, .option])
+                .disabled(HistoryModel.shared.lastUndoableBatch.isEmpty)
+            Divider()
             Button("Réessayer les échecs") { model.retryFailed() }
             Button("Vider les fichiers traités") { model.clearFinished() }.keyboardShortcut(.delete, modifiers: [.command, .shift])
             Divider()
@@ -102,6 +116,8 @@ enum AddPanel {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     static var openMain: (() -> Void)?
+    static var openHistory: (() -> Void)?
+    static var openSettingsWindow: (() -> Void)?
     private let services = ServicesProvider()
 
     @MainActor static func showMainWindow() {
@@ -113,14 +129,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    @MainActor static func showHistory() {
+        MenuBarController.shared.close(animated: false)
+        NSApp.activate()
+        if let w = NSApp.windows.first(where: { $0.identifier?.rawValue == "history" }), w.isVisible {
+            w.makeKeyAndOrderFront(nil)
+        } else if let open = openHistory {
+            open()
+        } else {
+            showMainWindow()
+        }
+    }
+
+    @MainActor static func showSettings() {
+        MenuBarController.shared.close(animated: false)
+        NSApp.activate()
+        if let open = openSettingsWindow { open() } else { showMainWindow() }
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.servicesProvider = services
         NSUpdateDynamicServices()
         Notifier.requestAuthorization()
         MainActor.assumeIsolated {
+            _ = HistoryModel.shared
             FolderWatcher.shared.reload()
             Scheduler.shared.start()
             ClipboardOptimizer.shared.apply()
+            MenuBarController.shared.install()
         }
         cleanupOrphanedTemps()
     }

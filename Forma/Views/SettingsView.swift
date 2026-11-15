@@ -11,6 +11,7 @@ struct SettingsView: View {
             Tab("Audio", systemImage: "waveform") { AudioSettingsView() }
             Tab("Sortie", systemImage: "folder") { OutputSettingsView() }
             Tab("Automatisation", systemImage: "bolt.horizontal") { AutomationSettings() }
+            Tab("Presse-papiers", systemImage: "doc.on.clipboard") { ClipboardSettingsView() }
             Tab("Préréglages", systemImage: "square.stack") { PresetsSettings() }
             Tab("Moteurs", systemImage: "cpu") { EnginesSettings() }
         }
@@ -42,6 +43,18 @@ struct GeneralSettings: View {
                 Picker("Apparence", selection: $store.prefs.appearance) {
                     ForEach(AppearanceMode.allCases) { Text($0.label).tag($0) }
                 }
+            }
+            Section {
+                Toggle("Garder l'historique des traitements", isOn: $store.prefs.historyEnabled)
+                Picker("Conserver", selection: $store.prefs.historyRetentionDays) {
+                    Text("7 jours").tag(7); Text("30 jours").tag(30); Text("90 jours").tag(90)
+                    Text("1 an").tag(365); Text("Sans limite").tag(0)
+                }
+                .disabled(!store.prefs.historyEnabled)
+            } header: {
+                Text("Historique")
+            } footer: {
+                Text("Chaque traitement (app, Terminal, Raccourcis, dossiers surveillés) peut être annulé : le résultat part à la Corbeille et l'original revient s'il y avait été mis. ⌘Y pour l'ouvrir, ⌥⌘Z pour annuler le dernier lot.")
             }
             Section {
                 Picker("Images en parallèle", selection: $store.prefs.maxParallelImages) {
@@ -546,26 +559,6 @@ struct AutomationSettings: View {
                 Text("Chaque nouveau fichier déposé dans un dossier surveillé est traité automatiquement (ex. : Captures d'écran → WebP). Les résultats vont dans un sous-dossier.")
             }
 
-            Section {
-                Toggle("Optimiser les images copiées", isOn: $store.prefs.clipboardEnabled)
-                    .onChange(of: store.prefs.clipboardEnabled) { ClipboardOptimizer.shared.apply() }
-                Picker("Format", selection: $store.prefs.clipboardTarget) {
-                    Text("Même format").tag("SAME")
-                    ForEach(["WEBP", "JPEG", "PNG", "AVIF", "HEIC"], id: \.self) { Text(FormatCatalog.format($0)!.name).tag($0) }
-                }
-                Picker("Taille max", selection: $store.prefs.clipboardMaxDimension) {
-                    Text("Originale").tag(Int?.none)
-                    ForEach([1280, 1920, 2560, 3840], id: \.self) { Text("\($0) px").tag(Int?.some($0)) }
-                }
-                LabeledContent("Qualité \(store.prefs.clipboardQuality)") {
-                    Slider(value: Binding(get: { Double(store.prefs.clipboardQuality) }, set: { store.prefs.clipboardQuality = Int($0) }), in: 30...100)
-                }
-            } header: {
-                Text("Presse-papiers")
-            } footer: {
-                Text("Captures d'écran et images copiées sont allégées en arrière-plan (⌥⌘V pour le faire à la demande). Les mots de passe et fichiers copiés sont ignorés.")
-            }
-
             Section("Traitements planifiés") {
                 if store.prefs.scheduledJobs.isEmpty {
                     Text("Aucun. Utilisez « … › Planifier pour plus tard » dans la fenêtre principale.").foregroundStyle(.secondary)
@@ -605,6 +598,9 @@ struct WatchedFolderSheet: View {
                         Picker("Images →", selection: $folder.imageTarget) { ForEach(FormatCatalog.images) { Text($0.name).tag($0.id) } }
                         Picker("Vidéos →", selection: $folder.videoTarget) { ForEach(FormatCatalog.video + FormatCatalog.audio) { Text($0.name).tag($0.id) } }
                         Picker("Audio →", selection: $folder.audioTarget) { ForEach(FormatCatalog.audio) { Text($0.name).tag($0.id) } }
+                        Picker("Documents →", selection: Binding(get: { folder.officeTarget ?? "PDFDOC" }, set: { folder.officeTarget = $0 })) {
+                            ForEach(FormatCatalog.office) { Text($0.name).tag($0.id) }
+                        }
                     }
                     TextField("Sous-dossier de sortie", text: $folder.outputSubfolder)
                     Toggle("Inclure les sous-dossiers", isOn: $folder.includeSubfolders)

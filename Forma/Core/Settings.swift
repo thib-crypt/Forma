@@ -484,6 +484,7 @@ struct WatchedFolder: Codable, Equatable, Identifiable, Sendable {
     var imageTarget = "WEBP"
     var videoTarget = "MP4"
     var audioTarget = "M4A"
+    var officeTarget: String? = nil       // optional: folders saved before documents were supported
     var includeSubfolders = false
     var processExisting = false
     var outputSubfolder = "Forma"
@@ -512,6 +513,12 @@ struct ProcessingSnapshot: Codable, Equatable, Sendable {
     var compressWhileConverting = false
     var compressAfterConverting = false
     var upscaleTarget = "SAME"          // "SAME" keeps the original format when it can be written losslessly enough
+    /// Optional on disk so snapshots saved by older versions (scheduled jobs) still decode.
+    var documentTarget: String? = nil
+    var officeTarget: String {
+        get { documentTarget ?? "PDFDOC" }
+        set { documentTarget = newValue }
+    }
 
     func target(for url: URL, kind: MediaKind, mode: ProcessMode) -> FormatDescriptor? {
         if mode == .upscale {
@@ -530,6 +537,7 @@ struct ProcessingSnapshot: Codable, Equatable, Sendable {
         case .image, .document: return FormatCatalog.format(imageTarget)
         case .video: return FormatCatalog.format(videoTarget)
         case .audio: return FormatCatalog.format(audioTarget)
+        case .office: return FormatCatalog.format(officeTarget)
         }
     }
 }
@@ -576,10 +584,15 @@ struct Preferences: Codable, Equatable, Sendable {
     var maxParallelImages = 0     // 0 = auto (performance cores)
     var maxParallelVideos = 2
 
+    // Forma 1.1 clipboard settings: only read to migrate into `clipboard`.
     var clipboardEnabled = false
     var clipboardTarget = "WEBP"  // or "SAME"
     var clipboardMaxDimension: Int? = 2560
     var clipboardQuality = 80
+    var clipboard = ClipboardSettings()
+
+    var historyEnabled = true
+    var historyRetentionDays = 90   // 0 = forever
 }
 
 @MainActor
@@ -594,6 +607,7 @@ final class PreferencesStore {
             save()
             if prefs.showInMenuBar != menuBarVisible { menuBarVisible = prefs.showInMenuBar }
             if prefs.appearance != appearance { appearance = prefs.appearance }
+            if prefs.historyEnabled != oldValue.historyEnabled { HistoryStore.shared.enabled = prefs.historyEnabled }
         }
     }
     /// Mirrors used by scene-level code so the App body doesn't re-evaluate on every settings change.
@@ -604,7 +618,14 @@ final class PreferencesStore {
 
     private init() {
         var loaded = Preferences()
-        if let data = UserDefaults.standard.data(forKey: key), let p = Self.decode(data) { loaded = p }
+        if let data = UserDefaults.standard.data(forKey: key), let p = Self.decode(data) {
+            loaded = p
+            // First launch with rules: carry over the old single-setting optimizer.
+            if let raw = try? JSONSerialization.jsonObject(with: data) as? [String: Any], raw["clipboard"] == nil {
+                loaded.clipboard = ClipboardSettings.migrated(enabled: p.clipboardEnabled, target: p.clipboardTarget,
+                                                              maxDimension: p.clipboardMaxDimension, quality: p.clipboardQuality)
+            }
+        }
         prefs = loaded
         menuBarVisible = loaded.showInMenuBar
         appearance = loaded.appearance

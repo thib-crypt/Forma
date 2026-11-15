@@ -130,6 +130,8 @@ extension Int64 {
 }
 
 extension URL {
-    var fileSize: Int64 { Int64((try? resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0) }
+    /// Read from the file system every time: URL resource values are cached per instance, and a URL whose
+    /// file was trashed then replaced (overwrite policy) would otherwise report the old size.
+    var fileSize: Int64 { ((try? FileManager.default.attributesOfItem(atPath: path))?[.size] as? NSNumber)?.int64Value ?? 0 }
     var isDirectory: Bool { (try? resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false }
 }

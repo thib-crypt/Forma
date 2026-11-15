@@ -188,6 +188,7 @@ final class FolderWatcher {
         snap.imageTarget = folder.imageTarget
         snap.videoTarget = folder.videoTarget
         snap.audioTarget = folder.audioTarget
+        if let t = folder.officeTarget { snap.officeTarget = t }
         snap.output.replaceOriginals = false
         snap.output.destination = .alongside
         let out = URL(fileURLWithPath: folder.path).appendingPathComponent(folder.outputSubfolder.isEmpty ? "Forma" : folder.outputSubfolder)
@@ -196,7 +197,7 @@ final class FolderWatcher {
         let snapshot = snap
         await limiter.run {
             do {
-                let r = try await Pipeline.run(input: url, mode: folder.mode, snapshot: snapshot, index: 1, outputFolder: out) { _ in }
+                let r = try await Pipeline.run(input: url, mode: folder.mode, snapshot: snapshot, index: 1, outputFolder: out, origin: .watch) { _ in }
                 await MainActor.run {
                     if let i = PreferencesStore.shared.prefs.watchedFolders.firstIndex(where: { $0.id == folder.id }) {
                         PreferencesStore.shared.prefs.watchedFolders[i].processedCount += 1
@@ -266,6 +267,6 @@ final class Scheduler {
             return
         }
         model.add(urls, mode: job.mode, autoStart: false)
-        model.start(mode: job.mode, snapshot: job.snapshot)
+        model.start(mode: job.mode, snapshot: job.snapshot, origin: .schedule)
     }
 }

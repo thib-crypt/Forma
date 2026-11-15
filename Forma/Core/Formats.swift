@@ -3,14 +3,15 @@ import UniformTypeIdentifiers
 
 /// Nature of a media file, as detected from its extension / UTType.
 enum MediaKind: String, Codable, CaseIterable, Identifiable, Sendable {
-    case image, video, audio, document
+    case image, video, audio, document, office
     var id: String { rawValue }
     var label: String {
         switch self {
         case .image: "Images"
         case .video: "Vidéos"
         case .audio: "Audio"
-        case .document: "Documents"
+        case .document: "PDF & vectoriels"
+        case .office: "Documents"
         }
     }
     var symbol: String {
@@ -19,8 +20,11 @@ enum MediaKind: String, Codable, CaseIterable, Identifiable, Sendable {
         case .video: "film"
         case .audio: "waveform"
         case .document: "doc.richtext"
+        case .office: "doc.text"
         }
     }
+    /// Kinds shown to the user (PDF / EPS sources are handled with the images).
+    static let visible: [MediaKind] = [.image, .video, .audio, .office]
 }
 
 /// How an output format is produced. Native writers are always preferred (fastest, zero dependency).
@@ -34,6 +38,7 @@ enum Writer: Sendable {
     case audio(codec: String, muxer: String?, extra: [String])
     case video(container: String?, forcedVideo: String?, forcedAudio: String?, extra: [String])
     case postscript(String)             // Ghostscript device (eps / ai)
+    case office                         // text documents, spreadsheets, slides (OfficeEngine routes by format id)
 }
 
 struct FormatDescriptor: Identifiable, Hashable, Sendable {
@@ -187,7 +192,36 @@ enum FormatCatalog {
         .init(id: "WEBPV", ext: "webp", name: "WebP animé", detail: "Vidéo → WebP animé", kind: .video, group: "Animations", writer: .animated("webp")),
     ]
 
-    static let all: [FormatDescriptor] = images + audio + video
+    // MARK: Documents
+    static let office: [FormatDescriptor] = [
+        .init(id: "PDFDOC", ext: "pdf", name: "PDF", detail: "Mise en page fixe, à partager", kind: .office, group: "Populaires", writer: .office, popular: true),
+        .init(id: "DOCX", ext: "docx", name: "Word (DOCX)", detail: "Microsoft Word moderne", kind: .office, group: "Populaires", writer: .office, popular: true),
+        .init(id: "ODT", ext: "odt", name: "ODT", detail: "OpenDocument (LibreOffice)", kind: .office, group: "Populaires", writer: .office, popular: true),
+        .init(id: "RTF", ext: "rtf", name: "RTF", detail: "Texte enrichi universel", kind: .office, group: "Populaires", writer: .office, popular: true),
+        .init(id: "TXT", ext: "txt", name: "Texte brut", detail: "UTF-8, sans mise en forme", kind: .office, group: "Populaires", writer: .office, popular: true),
+        .init(id: "MD", ext: "md", name: "Markdown", detail: "GitHub Flavored Markdown", kind: .office, group: "Populaires", writer: .office, popular: true),
+        .init(id: "HTML", ext: "html", name: "HTML", detail: "Page web autonome", kind: .office, group: "Populaires", writer: .office, popular: true),
+        .init(id: "EPUB", ext: "epub", name: "EPUB", detail: "Livre numérique (Livres, Kobo…)", kind: .office, group: "Populaires", writer: .office, popular: true),
+        .init(id: "DOC", ext: "doc", name: "Word 97–2003", detail: "Ancien format .doc", kind: .office, group: "Traitement de texte", writer: .office),
+        .init(id: "WEBARCHIVE", ext: "webarchive", name: "Archive Web", detail: "Safari", kind: .office, group: "Traitement de texte", writer: .office),
+        .init(id: "TEX", ext: "tex", name: "LaTeX", detail: "Source LaTeX autonome", kind: .office, group: "Balisage", writer: .office),
+        .init(id: "TYP", ext: "typ", name: "Typst", detail: "Composition moderne", kind: .office, group: "Balisage", writer: .office),
+        .init(id: "RST", ext: "rst", name: "reStructuredText", detail: "Documentation Python / Sphinx", kind: .office, group: "Balisage", writer: .office),
+        .init(id: "ADOC", ext: "adoc", name: "AsciiDoc", detail: "Documentation technique", kind: .office, group: "Balisage", writer: .office),
+        .init(id: "ORG", ext: "org", name: "Org", detail: "Org-mode (Emacs)", kind: .office, group: "Balisage", writer: .office),
+        .init(id: "WIKI", ext: "wiki", name: "MediaWiki", detail: "Syntaxe Wikipédia", kind: .office, group: "Balisage", writer: .office),
+        .init(id: "FB2", ext: "fb2", name: "FictionBook", detail: "Livre numérique FB2", kind: .office, group: "Balisage", writer: .office),
+        .init(id: "PPTX", ext: "pptx", name: "PowerPoint (PPTX)", detail: "Une diapositive par titre", kind: .office, group: "Présentations", writer: .office),
+        .init(id: "ODP", ext: "odp", name: "ODP", detail: "Présentation OpenDocument · LibreOffice", kind: .office, group: "Présentations", writer: .office),
+        .init(id: "XLSX", ext: "xlsx", name: "Excel (XLSX)", detail: "Classeur · LibreOffice", kind: .office, group: "Tableurs", writer: .office),
+        .init(id: "ODS", ext: "ods", name: "ODS", detail: "Classeur OpenDocument · LibreOffice", kind: .office, group: "Tableurs", writer: .office),
+        .init(id: "CSV", ext: "csv", name: "CSV", detail: "Valeurs séparées · LibreOffice", kind: .office, group: "Tableurs", writer: .office),
+    ]
+
+    /// Text outputs offered for PDF sources ("extract the text").
+    static let pdfTextOutputs: Set<String> = ["DOCX", "ODT", "RTF", "TXT", "MD", "HTML", "EPUB"]
+
+    static let all: [FormatDescriptor] = images + audio + video + office
     static let byID: [String: FormatDescriptor] = {
         var d: [String: FormatDescriptor] = [:]
         for f in all where d[f.id] == nil { d[f.id] = f }
@@ -198,17 +232,26 @@ enum FormatCatalog {
     /// Formats a given input kind can be converted to.
     static func outputs(for kind: MediaKind) -> [FormatDescriptor] {
         switch kind {
-        case .image, .document: images
+        case .image: images
+        case .document: images + office.filter { pdfTextOutputs.contains($0.id) }
         case .video: video + audio
         case .audio: audio
+        case .office: office
         }
+    }
+
+    /// The document flavour of a format chosen for another kind ("pdf" from the CLI or a mapping means PDFDOC for a .docx).
+    static func officeEquivalent(of f: FormatDescriptor) -> FormatDescriptor? {
+        f.kind == .office ? f : office.first { $0.ext == f.ext }
     }
 
     /// Best-effort format for an output target, used by CLI / Shortcuts ("jpg", "webp", "MP4"...).
     static func resolve(_ token: String) -> FormatDescriptor? {
         let t = token.uppercased().trimmingCharacters(in: CharacterSet(charactersIn: "."))
         if let f = byID[t] { return f }
-        let aliases = ["JPG": "JPEG", "TIF": "TIFF", "HEIF": "HEIC", "JPEGXL": "JXL", "OGGVORBIS": "OGG", "MPEG4": "MP4", "AIFF": "AIFF", "QT": "MOV"]
+        let aliases = ["JPG": "JPEG", "TIF": "TIFF", "HEIF": "HEIC", "JPEGXL": "JXL", "OGGVORBIS": "OGG", "MPEG4": "MP4", "AIFF": "AIFF", "QT": "MOV",
+                       "WORD": "DOCX", "MARKDOWN": "MD", "TEXT": "TXT", "PLAIN": "TXT", "HTM": "HTML", "LATEX": "TEX", "ASCIIDOC": "ADOC",
+                       "EXCEL": "XLSX", "POWERPOINT": "PPTX", "TYPST": "TYP", "MEDIAWIKI": "WIKI"]
         if let a = aliases[t] { return byID[a] }
         return all.first { $0.ext.uppercased() == t }
     }
@@ -225,6 +268,7 @@ enum InputClass: Sendable, Equatable {
     case exotic          // needs ImageMagick to read
     case video
     case audio
+    case office          // text documents, spreadsheets, presentations, e-books
     case unsupported
 
     var mediaKind: MediaKind? {
@@ -233,6 +277,7 @@ enum InputClass: Sendable, Equatable {
         case .postscript, .pdf: .document
         case .video: .video
         case .audio: .audio
+        case .office: .office
         case .unsupported: nil
         }
     }
@@ -245,9 +290,22 @@ enum FileDetection {
     static let videoExts: Set<String> = ["mp4", "mov", "m4v", "mkv", "webm", "avi", "wmv", "flv", "f4v", "mpg", "mpeg", "m2v", "ts", "m2ts", "mts", "vob", "3gp", "3g2", "ogv", "mxf", "asf", "wtv", "dv", "hevc", "mjpeg", "rm", "rmvb", "divx"]
     static let audioExts: Set<String> = ["mp3", "m4a", "aac", "wav", "flac", "aiff", "aif", "aifc", "caf", "ogg", "oga", "opus", "wma", "ac3", "eac3", "dts", "mka", "wv", "tta", "w64", "au", "snd", "mp2", "voc", "amr", "ape", "m4r", "m4b", "sf", "spx", "mid", "midi"]
 
+    static let officeExts: Set<String> = [
+        // word processing
+        "doc", "docx", "docm", "dotx", "odt", "ott", "rtf", "rtfd", "txt", "text", "pages", "wpd",
+        // web & markup
+        "html", "htm", "xhtml", "webarchive", "md", "markdown", "mdown", "mkd", "rst", "org", "tex", "latex", "adoc", "asciidoc",
+        "typ", "textile", "wiki", "mediawiki", "dbk", "opml", "ipynb", "djot",
+        // e-books
+        "epub", "fb2",
+        // spreadsheets & presentations
+        "xlsx", "xlsm", "xls", "ods", "csv", "tsv", "numbers", "pptx", "ppt", "pps", "ppsx", "odp", "key",
+    ]
+
     static func classify(_ url: URL) -> InputClass {
         let ext = url.pathExtension.lowercased()
         if ext.isEmpty { return .unsupported }
+        if officeExts.contains(ext) { return .office }
         if rawExts.contains(ext) { return .raw }
         if postscriptExts.contains(ext) { return .postscript }
         if ext == "pdf" { return .pdf }
