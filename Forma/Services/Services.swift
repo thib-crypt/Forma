@@ -78,12 +78,18 @@ final class ServicesProvider: NSObject {
     @objc func upscaleFiles(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
         handle(pboard, mode: .upscale, start: true)
     }
+    /// "Ajouter" fills the window as before; the other services run in the background (`JobCenter`), without a window.
     private func handle(_ pb: NSPasteboard, mode: ProcessMode?, start: Bool) {
         let urls = (pb.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]) ?? []
         Task { @MainActor in
-            AppDelegate.showMainWindow()
-            let n = AppModel.shared.add(urls, mode: mode, autoStart: start)
-            if n == 0 { Toast.show("Aucun fichier compatible dans la sélection", symbol: "exclamationmark.triangle") }
+            guard start, let mode else {
+                AppDelegate.showMainWindow()
+                let n = AppModel.shared.add(urls, mode: mode, autoStart: start)
+                if n == 0 { Toast.show("Aucun fichier compatible dans la sélection", symbol: "exclamationmark.triangle") }
+                return
+            }
+            guard !urls.isEmpty else { NSSound.beep(); return }
+            JobCenter.shared.submit(ExternalRequest(source: .service, mode: mode, paths: urls.map(\.path)))
         }
     }
 }

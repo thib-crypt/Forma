@@ -8,6 +8,11 @@ enum FormaMain {
         if CLI.shouldHandle(args) {
             exit(CLI.run(args))
         }
+        // Launched by the Finder / Share extension: no window, no Dock icon (decided before NSApp exists).
+        if LaunchContext.detectHeadless(args) {
+            MainActor.assumeIsolated { LaunchContext.headless = true }
+            NSApplication.shared.setActivationPolicy(.accessory)
+        }
         FormaApp.main()
     }
 }
@@ -27,7 +32,7 @@ struct FormaApp: App {
                 .background(WindowOpenerBridge())
         }
         .defaultSize(width: 980, height: 660)
-        .defaultLaunchBehavior(.presented)
+        .defaultLaunchBehavior(LaunchContext.headless ? .suppressed : .presented)
         .restorationBehavior(.disabled)
         .windowToolbarStyle(.unified)
         .commands { FormaCommands(model: model, store: store) }
@@ -121,6 +126,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let services = ServicesProvider()
 
     @MainActor static func showMainWindow() {
+        LaunchContext.becomeInteractive()
         NSApp.activate()
         if let w = NSApp.windows.first(where: { $0.identifier?.rawValue == "main" || $0.title == "Forma" }) {
             w.makeKeyAndOrderFront(nil)
@@ -131,6 +137,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @MainActor static func showHistory() {
         MenuBarController.shared.close(animated: false)
+        LaunchContext.becomeInteractive()
         NSApp.activate()
         if let w = NSApp.windows.first(where: { $0.identifier?.rawValue == "history" }), w.isVisible {
             w.makeKeyAndOrderFront(nil)
@@ -143,8 +150,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @MainActor static func showSettings() {
         MenuBarController.shared.close(animated: false)
+        LaunchContext.becomeInteractive()
         NSApp.activate()
         if let open = openSettingsWindow { open() } else { showMainWindow() }
+    }
+
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        MainActor.assumeIsolated {
+            // Before launch completes, so the URL that launched us is routed here and never opens a window.
+            RequestRouter.shared.installURLHandler()
+            if LaunchContext.headless { NSApp.setActivationPolicy(.accessory) }
+        }
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -157,19 +173,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Scheduler.shared.start()
             ClipboardOptimizer.shared.apply()
             MenuBarController.shared.install()
+            MenuConfigPublisher.shared.start()
+            RequestRouter.shared.drainInbox()
+            observeWindowsForDockPolicy()
+            LaunchContext.updateDockPolicy()
+            // Safety net: a headless launch whose request vanished must not linger.
+            LaunchContext.quitIfIdle(after: 15)
         }
         cleanupOrphanedTemps()
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
         MainActor.assumeIsolated {
+            let links = urls.filter { $0.scheme?.lowercased() == GroupContainer.scheme }
+            links.forEach(RequestRouter.shared.handle)
+            let files = urls.filter(\.isFileURL)
+            guard !files.isEmpty else { return }
             AppDelegate.showMainWindow()
-            AppModel.shared.add(urls)
+            AppModel.shared.add(files)
+        }
+    }
+
+    /// Dock icon only while a window is open, in headless or "mode discret".
+    @MainActor private func observeWindowsForDockPolicy() {
+        let nc = NotificationCenter.default
+        let update: @Sendable (Notification) -> Void = { _ in
+            DispatchQueue.main.async { MainActor.assumeIsolated { LaunchContext.updateDockPolicy() } }
+        }
+        for name in [NSWindow.didBecomeKeyNotification, NSWindow.didBecomeMainNotification, NSWindow.willCloseNotification,
+                     NSWindow.didMiniaturizeNotification] {
+            nc.addObserver(forName: name, object: nil, queue: .main, using: update)
         }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-        MainActor.assumeIsolated { !PreferencesStore.shared.prefs.showInMenuBar }
+        MainActor.assumeIsolated {
+            !PreferencesStore.shared.prefs.showInMenuBar && !JobCenter.shared.isBusy && !ProgressHUD.shared.isVisible
+        }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -179,13 +219,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         MainActor.assumeIsolated {
-            guard AppModel.shared.isRunning else { return .terminateNow }
+            guard AppModel.shared.isRunning || JobCenter.shared.isBusy else { return .terminateNow }
             let alert = NSAlert()
             alert.messageText = "Un traitement est en cours"
             alert.informativeText = "Quitter maintenant annulera les fichiers en cours."
             alert.addButton(withTitle: "Quitter")
             alert.addButton(withTitle: "Annuler")
-            if alert.runModal() == .alertFirstButtonReturn { AppModel.shared.cancel(); return .terminateNow }
+            if alert.runModal() == .alertFirstButtonReturn {
+                AppModel.shared.cancel()
+                JobCenter.shared.cancelAll()
+                return .terminateNow
+            }
             return .terminateCancel
         }
     }

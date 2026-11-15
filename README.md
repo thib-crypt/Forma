@@ -38,6 +38,31 @@ Native macOS converter and compressor (SwiftUI, macOS 26, Apple Silicon), modele
 - **System integration**: menu bar with drop zone, Finder Services, Shortcuts (Convert / Compress),
   `forma` CLI, launch at login, notifications.
 
+## Finder, Share menu & recipes (1.3)
+- **Right-click in the Finder › Forma**: favourite formats first (“Convertir en WebP”), every format in “Convertir en…”,
+  compress (with any preset), AI upscale, recipes, “Ouvrir dans Forma…”, undo the last Finder batch. Mixed selections get one
+  section per kind; folders get “Convertir les images du dossier en…” and “Surveiller ce dossier”. Also on the window
+  background and as a Finder toolbar button. Nothing opens: Forma works in the background with a small progress HUD.
+- **Share › Forma** from any app (Finder, Photos, Preview, Safari images, Mail attachments): pick a format, a preset or a
+  recipe; results next to the original, in the shares folder (Downloads by default) or on the clipboard.
+- **Recipes**: complete reusable actions (“Web”: WebP, ≤ 1920 px, no metadata…), in the Finder menu, the Share panel, the menu
+  bar item, `forma run <name>` and Shortcuts (“Appliquer une recette Forma”).
+- Services (“Forma — Convertir / Compresser / Agrandir”) now run in the background too; they cover iCloud Drive / OneDrive
+  folders, where macOS hides extension menus, and accept keyboard shortcuts.
+- Links for launchers: `forma://convert?to=webp&path=/a.png`, `forma://compress?preset=web_optimized&path=…`,
+  `forma://recipe?name=Web&path=…`. Any web page can open such a link, so they never replace or delete originals.
+- Settings › Finder: extension status, favourites per kind, “rank by my habits”, menu entries, destination, HUD /
+  notification, shares folder, “hide from the Dock when no window is open”, recipe editor.
+
+How it works: the sandboxed extensions (`FormaFinder`, `FormaShare`) only write a request into the App Group
+(`~/Library/Group Containers/PG46BWSK3T.com.thibault.forma/Inbox/<id>.json`) and open `forma://job/<id>`; the app (launched
+headless, without window or Dock icon, if needed) runs it in `JobCenter`, a FIFO queue separate from the window, sharing
+the parallelism slots with it. The app writes `menu.json` for the extensions whenever settings or history change.
+Code shared by the three targets lives in `Forma/Shared/` (`MenuBuilder` is pure and unit-tested).
+
+Since 1.3 Forma is signed with the Developer ID of team PG46BWSK3T (App Groups need it). macOS asks once again for
+Desktop / Documents / Downloads access and the login item may need re-enabling; after that, permissions survive rebuilds.
+
 ## Engines
 Native first: ImageIO / Core Graphics (HEIC, AVIF, JPEG, PNG, TIFF, JP2, ICO, ICNS, PSD, EXR, DDS…), FFmpeg + VideoToolbox/AudioToolbox.
 Homebrew (optional): `brew install imagemagick ffmpeg ghostscript webp jpeg-xl mozjpeg pngquant oxipng gifsicle pandoc`,
@@ -45,8 +70,12 @@ and `brew install --cask libreoffice` for faithful Word/Excel/PowerPoint layouts
 
 ## Build
 ```
-xcodegen generate
-xcodebuild -scheme Forma -configuration Release -derivedDataPath build-release build
-cp -R build-release/Build/Products/Release/Forma.app /Applications/
+scripts/install.sh          # xcodegen + Release build + install in /Applications + register/enable the extensions
+xcodebuild test -scheme Forma -derivedDataPath build -only-testing:FormaTests
 ```
-CLI: Settings › Engines › "`forma` command", then `forma convert *.heic --to jpg`, `forma compress clip.mov`, `forma formats`.
+`install.sh` unregisters the extensions left in `build-release/`, otherwise PlugInKit may load that copy.
+Troubleshooting: `forma finder status` (loaded copy, pending requests), `forma finder reset`,
+`forma finder menu <files…>` (prints the exact menu the Finder would show), `forma request convert --to webp <files…>`
+(goes through the same path as a Finder click).
+CLI: Settings › Engines › "`forma` command", then `forma convert *.heic --to jpg`, `forma compress clip.mov`, `forma formats`,
+`forma run Web *.png`, `forma run --list`.

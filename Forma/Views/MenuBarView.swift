@@ -28,6 +28,9 @@ struct MenuBarView: View {
                     .transition(.blurReplace.combined(with: .opacity))
             }
 
+            BackgroundJobsCard()
+                .padding(.horizontal, 12)
+
             RecentSection()
 
             PanelDivider()
@@ -413,6 +416,68 @@ private struct ActivityCard: View {
     }
 }
 
+// MARK: - Background jobs (drops on the panel, Finder, Share…)
+
+private struct BackgroundJobsCard: View {
+    @State private var center = JobCenter.shared
+    @State private var dismissed: UUID?
+
+    private var job: BackgroundJob? {
+        if let a = center.active { return a }
+        guard let last = center.lastFinished, last.id != dismissed, !last.undone,
+              Date().timeIntervalSince(last.finishedAt ?? .distantPast) < 300 else { return nil }
+        return last
+    }
+
+    var body: some View {
+        if let job {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: job.isDone ? (job.failures.isEmpty ? "checkmark.circle.fill" : "exclamationmark.triangle.fill") : job.mode.tileSymbol)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(job.isDone ? (job.failures.isEmpty ? Color.green : Color.orange) : job.mode.tint)
+                        .symbolEffect(.pulse, isActive: job.isActive)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(job.isDone ? job.summary : job.title).font(.system(size: 12, weight: .semibold)).lineLimit(1)
+                        Text(job.isDone ? job.title : job.currentNames.isEmpty ? "Préparation…" : job.currentNames)
+                            .font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                    }
+                    Spacer(minLength: 4)
+                    if job.isActive {
+                        Text("\(job.processed)/\(job.total)").font(.system(size: 11, weight: .medium)).monospacedDigit().foregroundStyle(.secondary)
+                        Button { center.cancel(job) } label: { Image(systemName: "stop.fill") }
+                            .buttonStyle(PanelIconButtonStyle(size: 22)).help("Arrêter")
+                    } else {
+                        Button { dismissed = job.id } label: { Image(systemName: "xmark") }
+                            .buttonStyle(PanelIconButtonStyle(size: 20)).help("Masquer")
+                    }
+                }
+                if job.isActive {
+                    ProgressView(value: job.fraction).progressViewStyle(.linear).tint(job.mode.tint)
+                        .animation(.linear(duration: 0.15), value: job.fraction)
+                    if center.queued.count > 0 {
+                        Text("+ \(center.queued.count) en attente").font(.system(size: 10.5)).foregroundStyle(.secondary)
+                    }
+                } else if !job.outputs.isEmpty {
+                    HStack(spacing: 6) {
+                        Button { NSWorkspace.shared.activateFileViewerSelecting(job.outputs) } label: { Label("Afficher", systemImage: "magnifyingglass") }
+                        if !job.historyIDs.isEmpty {
+                            Button { center.undo(job) } label: { Label("Annuler", systemImage: "arrow.uturn.backward") }
+                        }
+                        ShareLink(items: job.outputs) { Label("Partager", systemImage: "square.and.arrow.up") }
+                    }
+                    .buttonStyle(PanelCapsuleButtonStyle())
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.primary.opacity(0.045), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .padding(.bottom, 12)
+            .transition(.blurReplace.combined(with: .opacity))
+        }
+    }
+}
+
 // MARK: - Recent results
 
 private struct RecentSection: View {
@@ -490,6 +555,9 @@ private struct RecentRow: View {
                     Button { copy() } label: { Image(systemName: copied ? "checkmark" : "doc.on.doc") }
                         .buttonStyle(PanelIconButtonStyle(size: 24))
                         .help("Copier le fichier")
+                    ShareLink(items: entry.outputURLs) { Image(systemName: "square.and.arrow.up") }
+                        .buttonStyle(PanelIconButtonStyle(size: 24))
+                        .help("Partager")
                     Button { NSWorkspace.shared.activateFileViewerSelecting(entry.outputURLs) } label: {
                         Image(systemName: "magnifyingglass")
                     }
@@ -519,7 +587,7 @@ private struct RecentRow: View {
     }
 }
 
-private struct FileThumbnail: View {
+struct FileThumbnail: View {
     let url: URL
     @State private var image: NSImage?
 
@@ -698,7 +766,7 @@ struct PanelIconButtonStyle: ButtonStyle {
     }
 }
 
-private struct PanelCapsuleButtonStyle: ButtonStyle {
+struct PanelCapsuleButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {

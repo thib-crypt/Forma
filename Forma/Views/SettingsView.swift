@@ -3,19 +3,22 @@ import AppKit
 import UniformTypeIdentifiers
 
 struct SettingsView: View {
+    @State private var nav = SettingsNavigation.shared
+
     var body: some View {
-        TabView {
-            Tab("Général", systemImage: "gearshape") { GeneralSettings() }
-            Tab("Images", systemImage: "photo") { ImageSettingsView() }
-            Tab("Vidéo", systemImage: "film") { VideoSettingsView() }
-            Tab("Audio", systemImage: "waveform") { AudioSettingsView() }
-            Tab("Sortie", systemImage: "folder") { OutputSettingsView() }
-            Tab("Automatisation", systemImage: "bolt.horizontal") { AutomationSettings() }
-            Tab("Presse-papiers", systemImage: "doc.on.clipboard") { ClipboardSettingsView() }
-            Tab("Préréglages", systemImage: "square.stack") { PresetsSettings() }
-            Tab("Moteurs", systemImage: "cpu") { EnginesSettings() }
+        TabView(selection: $nav.tab) {
+            Tab("Général", systemImage: "gearshape", value: .general) { GeneralSettings() }
+            Tab("Images", systemImage: "photo", value: .images) { ImageSettingsView() }
+            Tab("Vidéo", systemImage: "film", value: .video) { VideoSettingsView() }
+            Tab("Audio", systemImage: "waveform", value: .audio) { AudioSettingsView() }
+            Tab("Sortie", systemImage: "folder", value: .output) { OutputSettingsView() }
+            Tab("Automatisation", systemImage: "bolt.horizontal", value: .automation) { AutomationSettings() }
+            Tab("Presse-papiers", systemImage: "doc.on.clipboard", value: .clipboard) { ClipboardSettingsView() }
+            Tab("Finder", systemImage: "contextualmenu.and.cursorarrow", value: SettingsNavigation.Tab.finder) { FinderSettingsView() }
+            Tab("Préréglages", systemImage: "square.stack", value: .presets) { PresetsSettings() }
+            Tab("Moteurs", systemImage: "cpu", value: .engines) { EnginesSettings() }
         }
-        .frame(width: 640, height: 600)
+        .frame(width: 700, height: 620)
     }
 }
 

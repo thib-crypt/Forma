@@ -5,12 +5,34 @@ options:
     macOS: "26.0"
   createIntermediateGroups: true
   developmentLanguage: fr
+settings:
+  base:
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "Developer ID Application"
+    DEVELOPMENT_TEAM: PG46BWSK3T
+    OTHER_CODE_SIGN_FLAGS: "--timestamp=none"
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.3"
+    CURRENT_PROJECT_VERSION: "1"
+    MACOSX_DEPLOYMENT_TARGET: "26.0"
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+    SWIFT_OPTIMIZATION_LEVEL: "-O"
+    DEAD_CODE_STRIPPING: YES
 targets:
   Forma:
     type: application
     platform: macOS
     sources:
       - path: Forma
+    dependencies:
+      - target: FormaFinder
+      - target: FormaShare
+    scheme:
+      testTargets: [FormaTests]
+    entitlements:
+      path: Forma/Forma.entitlements
+      properties:
+        com.apple.security.application-groups: [PG46BWSK3T.com.thibault.forma]
     info:
       path: Forma/Info.plist
       properties:
@@ -19,6 +41,9 @@ targets:
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         LSApplicationCategoryType: public.app-category.utilities
         LSMinimumSystemVersion: "26.0"
+        CFBundleURLTypes:
+          - CFBundleURLName: com.thibault.forma
+            CFBundleURLSchemes: [forma]
         NSHumanReadableCopyright: "Convertisseur & compresseur local pour le Mac de Thibault"
         NSDesktopFolderUsageDescription: "Forma enregistre les fichiers convertis à côté des originaux."
         NSDocumentsFolderUsageDescription: "Forma enregistre les fichiers convertis à côté des originaux."
@@ -93,16 +118,90 @@ targets:
       base:
         PRODUCT_NAME: Forma
         PRODUCT_BUNDLE_IDENTIFIER: com.thibault.forma
-        SWIFT_VERSION: "5.0"
-        MARKETING_VERSION: "1.2"
-        CURRENT_PROJECT_VERSION: "1"
         GENERATE_INFOPLIST_FILE: NO
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_APP_SANDBOX: NO
         ENABLE_HARDENED_RUNTIME: NO
-        CODE_SIGN_STYLE: Manual
-        CODE_SIGN_IDENTITY: "-"
-        DEVELOPMENT_TEAM: ""
-        ENABLE_USER_SCRIPT_SANDBOXING: NO
-        SWIFT_OPTIMIZATION_LEVEL: "-O"
-        DEAD_CODE_STRIPPING: YES
+
+  FormaFinder:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: FormaFinder
+      - path: Forma/Shared
+    info:
+      path: FormaFinder/Info.plist
+      properties:
+        CFBundleDisplayName: Forma
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        LSMinimumSystemVersion: "26.0"
+        NSHumanReadableCopyright: "Menu Forma dans le Finder"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.FinderSync
+          NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).FinderSync"
+          NSExtensionAttributes: {}
+    entitlements:
+      path: FormaFinder/FormaFinder.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.application-groups: [PG46BWSK3T.com.thibault.forma]
+    settings:
+      base:
+        PRODUCT_NAME: FormaFinder
+        PRODUCT_BUNDLE_IDENTIFIER: com.thibault.forma.FinderMenu
+        GENERATE_INFOPLIST_FILE: NO
+        ENABLE_APP_SANDBOX: YES
+        ENABLE_HARDENED_RUNTIME: NO
+        SKIP_INSTALL: YES
+
+  FormaShare:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: FormaShare
+      - path: Forma/Shared
+    info:
+      path: FormaShare/Info.plist
+      properties:
+        CFBundleDisplayName: Forma
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        LSMinimumSystemVersion: "26.0"
+        NSHumanReadableCopyright: "Convertir avec Forma depuis le menu Partager"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).ShareViewController"
+          NSExtensionAttributes:
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsFileWithMaxCount: 500
+              NSExtensionActivationSupportsImageWithMaxCount: 500
+              NSExtensionActivationSupportsMovieWithMaxCount: 100
+              NSExtensionActivationSupportsAttachmentsWithMaxCount: 500
+    entitlements:
+      path: FormaShare/FormaShare.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.application-groups: [PG46BWSK3T.com.thibault.forma]
+        com.apple.security.files.user-selected.read-only: true
+        com.apple.security.network.client: true
+    settings:
+      base:
+        PRODUCT_NAME: FormaShare
+        PRODUCT_BUNDLE_IDENTIFIER: com.thibault.forma.Share
+        GENERATE_INFOPLIST_FILE: NO
+        ENABLE_APP_SANDBOX: YES
+        ENABLE_HARDENED_RUNTIME: NO
+        SKIP_INSTALL: YES
+
+  FormaTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: FormaTests
+      - path: Forma/Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.thibault.forma.tests
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_OPTIMIZATION_LEVEL: "-Onone"

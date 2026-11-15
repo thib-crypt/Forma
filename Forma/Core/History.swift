@@ -5,7 +5,7 @@ import SQLite3
 
 /// Where a processed file came from (shown as a badge in the history).
 enum HistoryOrigin: String, Codable, Sendable, CaseIterable {
-    case app, cli, shortcut, watch, schedule, copia
+    case app, cli, shortcut, watch, schedule, copia, finder, share, service, url, menuBar
 
     var label: String {
         switch self {
@@ -15,8 +15,16 @@ enum HistoryOrigin: String, Codable, Sendable, CaseIterable {
         case .watch: "Dossier surveillé"
         case .schedule: "Planifié"
         case .copia: "Copia"
+        case .finder: "Finder"
+        case .share: "Partage"
+        case .service: "Service"
+        case .url: "Lien forma://"
+        case .menuBar: "Barre des menus"
         }
     }
+    /// Jobs started outside the main window, undoable from the Finder menu.
+    var isExternal: Bool { [.finder, .share, .service, .url].contains(self) }
+
     var symbol: String {
         switch self {
         case .app: "macwindow"
@@ -25,6 +33,11 @@ enum HistoryOrigin: String, Codable, Sendable, CaseIterable {
         case .watch: "eye"
         case .schedule: "clock"
         case .copia: "doc.on.clipboard"
+        case .finder: "folder"
+        case .share: "square.and.arrow.up"
+        case .service: "contextualmenu.and.cursorarrow"
+        case .url: "link"
+        case .menuBar: "menubar.rectangle"
         }
     }
 }

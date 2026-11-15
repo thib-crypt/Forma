@@ -10,72 +10,166 @@
 		006275E62C2D0D18C7920BC4 /* ClipboardSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15C6F364287EDF464E970441 /* ClipboardSettingsView.swift */; };
 		028E62E2965902B92612B440 /* ClipboardRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52AFB9541834F5E67BCF3750 /* ClipboardRules.swift */; };
 		05B93CC417A97CE4A8239A9E /* Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33D752FC2B42B27074D3681C /* Settings.swift */; };
+		096E6DF04C47B2FEBD998025 /* Formats.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B46A32095F18429D3F4D8FE /* Formats.swift */; };
 		0AE66F87BE7F957F0822262D /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3DDE14A7C02E4B77132F1EA /* MainView.swift */; };
+		1834F79B22EBA860A8516A4C /* JobCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32974F5188C2ADEB0507B3F2 /* JobCenter.swift */; };
+		1B6D214925E216D69FBE9B95 /* MenuBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = E07961D5176D2D69DDEC4AE0 /* MenuBuilder.swift */; };
 		1E902E332E32617D8A7F638F /* Tools.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD12C80A08799BD975B118A2 /* Tools.swift */; };
+		2CBF5881836B6B840AE3FC95 /* FormaShare.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B8B9B301EADF5195095BD33A /* FormaShare.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		2D49157CE11285B771D5BC60 /* Pipeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 33232C90819E6E7F839D2CFC /* Pipeline.swift */; };
 		2E89428BD570C7442531DCA6 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21515917D5FCE254149CC148 /* MenuBarView.swift */; };
+		2FB3DEA811A1BA4D3DC843F0 /* RequestRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C455EB16C1ACDC4EDB08CC1 /* RequestRouter.swift */; };
 		319445B93E6B400006248069 /* PreviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6246784DFF019E7619D33617 /* PreviewView.swift */; };
+		32844D72D86254BCF3BAECE7 /* GroupContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93EE1DBBF46442507F25A7FB /* GroupContainer.swift */; };
 		3856B61F489D6C4718F7C1B9 /* Clipboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = CE7698D8E5EF2108EA67BDD5 /* Clipboard.swift */; };
+		3AF642A717F9F981169B81E6 /* SharedTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46F8ADA0F7843FA22F2831BC /* SharedTypes.swift */; };
 		3EF76A180AA9C9CEA9C1819C /* BottomBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 311174FE5A3915874F41D91A /* BottomBar.swift */; };
+		3F42E72ABAC20B22158D5575 /* RequestPlanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 075458DE405352002517AAC0 /* RequestPlanner.swift */; };
 		400B984BB33687F03F654CE7 /* ImageEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 932CEF1A72D61C7D3C33815D /* ImageEngine.swift */; };
+		45CB92AB3BC124C6816F8650 /* MenuConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28F68637F24220D82669C54F /* MenuConfig.swift */; };
+		476FFF3ADB935AC845A9C809 /* MenuBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = E07961D5176D2D69DDEC4AE0 /* MenuBuilder.swift */; };
+		4B55615B9D3F17EDC4F5D9E4 /* SharedTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46F8ADA0F7843FA22F2831BC /* SharedTypes.swift */; };
 		4E34DC302F6657FC9FC5B762 /* MediaEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 388BAF323CB391F4DC0B2C87 /* MediaEngine.swift */; };
+		50B82552E5B0F068CFA3634E /* ExtensionStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64D1468BCA9624A5D85C171E /* ExtensionStatus.swift */; };
 		594A701D974644A339D8FAF6 /* Output.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71EDD8B35978D30E8746D2B4 /* Output.swift */; };
 		5A2C27B047A5D7E3A4EE4BCA /* AppModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E432222534DA7F9D712AF40 /* AppModel.swift */; };
+		5C3948AAEFA6DE28DFED39EA /* GroupContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93EE1DBBF46442507F25A7FB /* GroupContainer.swift */; };
+		5C3EEB74781EEC8E2B192E4E /* SharedTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46F8ADA0F7843FA22F2831BC /* SharedTypes.swift */; };
 		5CFF4E1F7ADF9B341415B33B /* FormatPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = D639EC8388751920AE6C1A83 /* FormatPicker.swift */; };
+		60DC6B55937159FC52CFBD91 /* ExternalRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3D37259A3BF595C35111EEA /* ExternalRequest.swift */; };
 		6157112E413718C34D00BA37 /* Services.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40B7741A7A02574793B7425 /* Services.swift */; };
 		65F28ECD5F4498BF2C06CB20 /* DocumentEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E17785C05FAFCA9736B3323 /* DocumentEngine.swift */; };
+		6A24B388C5CB2B1ACF5E0C91 /* MenuConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28F68637F24220D82669C54F /* MenuConfig.swift */; };
 		6DB5A7E9A2B09478D53B0D8B /* Intents.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7B95842B20C472272AE86999 /* Intents.swift */; };
+		7340D65356224F68D98B71C2 /* Recipes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24C1034FCA07E15B88DEF802 /* Recipes.swift */; };
+		7493D626E40ACC54169B791E /* ProgressHUD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4909793B642337A852CDA6E4 /* ProgressHUD.swift */; };
 		83ADAA8C4448835B6406C212 /* HistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2855B9E54E9542E6E321ECE /* HistoryView.swift */; };
 		87F54790512133CADBF582B3 /* MenuBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71BFDE70880DAA8FCF8E23B9 /* MenuBarController.swift */; };
+		8AEB33649C1432F72A96EEDF /* MenuBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C6E7EC070538A9B047A98D8A /* MenuBuilderTests.swift */; };
+		8C7EF080A6CC1C46A868B80B /* FormaFinder.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = F3036E2FA086BE2224A50843 /* FormaFinder.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		8DDB47DE6EF46584A19FDD48 /* SharedTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46F8ADA0F7843FA22F2831BC /* SharedTypes.swift */; };
 		8E706B02336CB7945C5DF6E1 /* FormaApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 463DBA3F222B72835A9C0495 /* FormaApp.swift */; };
+		9180A656C5AE522666CA8679 /* MenuBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = E07961D5176D2D69DDEC4AE0 /* MenuBuilder.swift */; };
+		9435E71ED57BED1081B2C824 /* MenuConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28F68637F24220D82669C54F /* MenuConfig.swift */; };
+		9685AACA469F8479E9A0D3CA /* ExternalRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3D37259A3BF595C35111EEA /* ExternalRequest.swift */; };
+		9805F3A5F1F9A35AA850CC6F /* Formats.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B46A32095F18429D3F4D8FE /* Formats.swift */; };
 		9F4EB9675CCD63650B0BE81B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BF36FB005541C2F15D619FE /* SettingsView.swift */; };
+		A6B2831A227988E8234CCE07 /* Formats.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B46A32095F18429D3F4D8FE /* Formats.swift */; };
+		A7570EFA554201B19E57A0C5 /* ExternalRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3D37259A3BF595C35111EEA /* ExternalRequest.swift */; };
 		A86083BCE84EA98CF45D2AE5 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 85A04D740D98F94AF8D1C01A /* Assets.xcassets */; };
+		AA2189B8336D303D50571DB5 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C07F6AAC3738BFAD1B2E44A /* ShareViewController.swift */; };
 		AC5EDD85A73A52587F6E48A2 /* FileListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 159847073BFDC3AF7233FCB1 /* FileListView.swift */; };
 		AFD7F4494CEBC30F9CAC609B /* PreviewRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 228BEE5EFA30EFA056A2F99A /* PreviewRenderer.swift */; };
+		C7C1E9F9A098EF5E4837C74C /* MenuConfigPublisher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F9D54D1B7305D2BBA311357 /* MenuConfigPublisher.swift */; };
 		CC33FE33F57D544C6833D2D5 /* HistoryModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F7A2C059158514B158C8E1B /* HistoryModel.swift */; };
 		CD05069128D45CB4B7128310 /* OfficeEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 954C4992E613D1E064B91281 /* OfficeEngine.swift */; };
 		D2B20539A265C9024F6D761A /* CLI.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4FE13BCD7CFAB0EF231AEEC /* CLI.swift */; };
+		D47B9908FA9755E883D655B1 /* Formats.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B46A32095F18429D3F4D8FE /* Formats.swift */; };
+		D4F69455EABBBFFB74F9324B /* MenuBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = E07961D5176D2D69DDEC4AE0 /* MenuBuilder.swift */; };
+		D51929C115C5D637B81DC3C3 /* ExternalRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3D37259A3BF595C35111EEA /* ExternalRequest.swift */; };
+		D5752133B287B4E40A82EE3D /* FinderSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB10E548CCEC5A8056D75F6D /* FinderSettingsView.swift */; };
+		D66B7D65C4999CC77B47FEEE /* MenuConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28F68637F24220D82669C54F /* MenuConfig.swift */; };
+		D73B5179EBAC4381C9319725 /* ShareView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F2236CA13039B24E19C2D89 /* ShareView.swift */; };
 		D77E8D4EE145F7F3D117F65E /* UpscaleViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6440F692F2D66C0160DBA7D9 /* UpscaleViews.swift */; };
+		D90EB8B20712EADB1EBBC208 /* FinderSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15CE0FB9CCD4B633984A7504 /* FinderSync.swift */; };
 		DA927F868401F82436F5D949 /* History.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76A573D7DECAA5A8A8DC6D34 /* History.swift */; };
+		E37261EAACF4858614F85517 /* GroupContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93EE1DBBF46442507F25A7FB /* GroupContainer.swift */; };
 		F937CA317265E62AEC45049F /* Upscaler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BD6618ED7A56DF61166678A /* Upscaler.swift */; };
-		FDD214C31D065FE99D3A920F /* Formats.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FE80EE95F1B0B002C727FB2 /* Formats.swift */; };
+		FAF4AD3621D94D35496EAA04 /* GroupContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 93EE1DBBF46442507F25A7FB /* GroupContainer.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		36B6665787AC84CD95BEE9A6 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5F544B9276C9BD1AAD79134F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0AC36A5518D7A2B39E3797C3;
+			remoteInfo = FormaFinder;
+		};
+		D9A2A200B090CA1BCF02D1F7 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5F544B9276C9BD1AAD79134F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 483560AB35BC21A29EDC9B56;
+			remoteInfo = FormaShare;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		DD513CF023FA290F83B4FB93 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				8C7EF080A6CC1C46A868B80B /* FormaFinder.appex in Embed Foundation Extensions */,
+				2CBF5881836B6B840AE3FC95 /* FormaShare.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
-		0FE80EE95F1B0B002C727FB2 /* Formats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Formats.swift; sourceTree = "<group>"; };
+		01578EFDB83DD79AB94375C5 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		075458DE405352002517AAC0 /* RequestPlanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RequestPlanner.swift; sourceTree = "<group>"; };
+		0B46A32095F18429D3F4D8FE /* Formats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Formats.swift; sourceTree = "<group>"; };
+		14479E865C22452C7D3AAA45 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		159847073BFDC3AF7233FCB1 /* FileListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileListView.swift; sourceTree = "<group>"; };
 		15C6F364287EDF464E970441 /* ClipboardSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardSettingsView.swift; sourceTree = "<group>"; };
+		15CE0FB9CCD4B633984A7504 /* FinderSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderSync.swift; sourceTree = "<group>"; };
+		1C07F6AAC3738BFAD1B2E44A /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
 		21515917D5FCE254149CC148 /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
 		228BEE5EFA30EFA056A2F99A /* PreviewRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewRenderer.swift; sourceTree = "<group>"; };
+		24C1034FCA07E15B88DEF802 /* Recipes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Recipes.swift; sourceTree = "<group>"; };
 		264A9B73EE8314C55721F274 /* Forma.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Forma.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		28F68637F24220D82669C54F /* MenuConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuConfig.swift; sourceTree = "<group>"; };
 		2E432222534DA7F9D712AF40 /* AppModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModel.swift; sourceTree = "<group>"; };
 		311174FE5A3915874F41D91A /* BottomBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BottomBar.swift; sourceTree = "<group>"; };
+		32974F5188C2ADEB0507B3F2 /* JobCenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JobCenter.swift; sourceTree = "<group>"; };
 		33232C90819E6E7F839D2CFC /* Pipeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pipeline.swift; sourceTree = "<group>"; };
 		33D752FC2B42B27074D3681C /* Settings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Settings.swift; sourceTree = "<group>"; };
 		388BAF323CB391F4DC0B2C87 /* MediaEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaEngine.swift; sourceTree = "<group>"; };
 		3BF36FB005541C2F15D619FE /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		3F2236CA13039B24E19C2D89 /* ShareView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareView.swift; sourceTree = "<group>"; };
 		3F7A2C059158514B158C8E1B /* HistoryModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryModel.swift; sourceTree = "<group>"; };
+		40640C0B35D7EE789489AC7B /* FormaFinder.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FormaFinder.entitlements; sourceTree = "<group>"; };
 		463DBA3F222B72835A9C0495 /* FormaApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormaApp.swift; sourceTree = "<group>"; };
+		46F8ADA0F7843FA22F2831BC /* SharedTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedTypes.swift; sourceTree = "<group>"; };
+		4909793B642337A852CDA6E4 /* ProgressHUD.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressHUD.swift; sourceTree = "<group>"; };
+		4CA2F55BC6FF26452C6D9905 /* FormaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FormaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		4F9D54D1B7305D2BBA311357 /* MenuConfigPublisher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuConfigPublisher.swift; sourceTree = "<group>"; };
 		52AFB9541834F5E67BCF3750 /* ClipboardRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClipboardRules.swift; sourceTree = "<group>"; };
 		6246784DFF019E7619D33617 /* PreviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreviewView.swift; sourceTree = "<group>"; };
 		6440F692F2D66C0160DBA7D9 /* UpscaleViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpscaleViews.swift; sourceTree = "<group>"; };
+		64D1468BCA9624A5D85C171E /* ExtensionStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExtensionStatus.swift; sourceTree = "<group>"; };
 		71BFDE70880DAA8FCF8E23B9 /* MenuBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarController.swift; sourceTree = "<group>"; };
 		71EDD8B35978D30E8746D2B4 /* Output.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Output.swift; sourceTree = "<group>"; };
 		76A573D7DECAA5A8A8DC6D34 /* History.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = History.swift; sourceTree = "<group>"; };
 		7B95842B20C472272AE86999 /* Intents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Intents.swift; sourceTree = "<group>"; };
 		85A04D740D98F94AF8D1C01A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		8C455EB16C1ACDC4EDB08CC1 /* RequestRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RequestRouter.swift; sourceTree = "<group>"; };
 		8E17785C05FAFCA9736B3323 /* DocumentEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentEngine.swift; sourceTree = "<group>"; };
 		932CEF1A72D61C7D3C33815D /* ImageEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageEngine.swift; sourceTree = "<group>"; };
+		93EE1DBBF46442507F25A7FB /* GroupContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupContainer.swift; sourceTree = "<group>"; };
 		954C4992E613D1E064B91281 /* OfficeEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfficeEngine.swift; sourceTree = "<group>"; };
 		9BD6618ED7A56DF61166678A /* Upscaler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Upscaler.swift; sourceTree = "<group>"; };
 		B40B7741A7A02574793B7425 /* Services.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services.swift; sourceTree = "<group>"; };
+		B8B9B301EADF5195095BD33A /* FormaShare.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = FormaShare.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		BD12C80A08799BD975B118A2 /* Tools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tools.swift; sourceTree = "<group>"; };
 		BF34CCB99D9E24FBD72E8FF3 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		C4FE13BCD7CFAB0EF231AEEC /* CLI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CLI.swift; sourceTree = "<group>"; };
+		C6E7EC070538A9B047A98D8A /* MenuBuilderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBuilderTests.swift; sourceTree = "<group>"; };
 		CE7698D8E5EF2108EA67BDD5 /* Clipboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Clipboard.swift; sourceTree = "<group>"; };
+		CF368242F8BD58768B3B21E8 /* FormaShare.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FormaShare.entitlements; sourceTree = "<group>"; };
 		D639EC8388751920AE6C1A83 /* FormatPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormatPicker.swift; sourceTree = "<group>"; };
+		E07961D5176D2D69DDEC4AE0 /* MenuBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBuilder.swift; sourceTree = "<group>"; };
+		E3D37259A3BF595C35111EEA /* ExternalRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalRequest.swift; sourceTree = "<group>"; };
 		E3DDE14A7C02E4B77132F1EA /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
 		F2855B9E54E9542E6E321ECE /* HistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryView.swift; sourceTree = "<group>"; };
+		F3036E2FA086BE2224A50843 /* FormaFinder.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = FormaFinder.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		F9EB454F70E65241F7B47CBF /* Forma.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Forma.entitlements; sourceTree = "<group>"; };
+		FB10E548CCEC5A8056D75F6D /* FinderSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderSettingsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -104,21 +198,51 @@
 			path = CLI;
 			sourceTree = "<group>";
 		};
+		4A4FDA164933617124D1289F /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				E3D37259A3BF595C35111EEA /* ExternalRequest.swift */,
+				0B46A32095F18429D3F4D8FE /* Formats.swift */,
+				93EE1DBBF46442507F25A7FB /* GroupContainer.swift */,
+				E07961D5176D2D69DDEC4AE0 /* MenuBuilder.swift */,
+				28F68637F24220D82669C54F /* MenuConfig.swift */,
+				46F8ADA0F7843FA22F2831BC /* SharedTypes.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
 		4CCC4034548A4D9E370AE0B3 /* Forma */ = {
 			isa = PBXGroup;
 			children = (
+				F9EB454F70E65241F7B47CBF /* Forma.entitlements */,
 				BF34CCB99D9E24FBD72E8FF3 /* Info.plist */,
 				C6A786918A19ECA319223EF8 /* App */,
 				201269BF77C746F09D12D4DE /* CLI */,
 				F248A6741CDF4EE9D660900D /* Core */,
 				BE3CB74DC8DCB51F4F0C8DC4 /* Engines */,
+				52762B0D66E57CEA0B80DEDF /* Integration */,
 				EC08DE171DC5A8ABC066A450 /* Intents */,
 				09D0E91C7462E1D6DBD7C3AB /* MenuBar */,
 				CB53C0D722337D2F503F2988 /* Resources */,
 				0C72B323A3E623A141B9A2F0 /* Services */,
+				4A4FDA164933617124D1289F /* Shared */,
 				5417385501C0A5CEF3925E0A /* Views */,
 			);
 			path = Forma;
+			sourceTree = "<group>";
+		};
+		52762B0D66E57CEA0B80DEDF /* Integration */ = {
+			isa = PBXGroup;
+			children = (
+				64D1468BCA9624A5D85C171E /* ExtensionStatus.swift */,
+				32974F5188C2ADEB0507B3F2 /* JobCenter.swift */,
+				4F9D54D1B7305D2BBA311357 /* MenuConfigPublisher.swift */,
+				4909793B642337A852CDA6E4 /* ProgressHUD.swift */,
+				24C1034FCA07E15B88DEF802 /* Recipes.swift */,
+				075458DE405352002517AAC0 /* RequestPlanner.swift */,
+				8C455EB16C1ACDC4EDB08CC1 /* RequestRouter.swift */,
+			);
+			path = Integration;
 			sourceTree = "<group>";
 		};
 		5417385501C0A5CEF3925E0A /* Views */ = {
@@ -127,6 +251,7 @@
 				311174FE5A3915874F41D91A /* BottomBar.swift */,
 				15C6F364287EDF464E970441 /* ClipboardSettingsView.swift */,
 				159847073BFDC3AF7233FCB1 /* FileListView.swift */,
+				FB10E548CCEC5A8056D75F6D /* FinderSettingsView.swift */,
 				D639EC8388751920AE6C1A83 /* FormatPicker.swift */,
 				F2855B9E54E9542E6E321ECE /* HistoryView.swift */,
 				E3DDE14A7C02E4B77132F1EA /* MainView.swift */,
@@ -138,18 +263,43 @@
 			path = Views;
 			sourceTree = "<group>";
 		};
+		7BBE1106888DDF29DDA6BED6 /* FormaTests */ = {
+			isa = PBXGroup;
+			children = (
+				C6E7EC070538A9B047A98D8A /* MenuBuilderTests.swift */,
+			);
+			path = FormaTests;
+			sourceTree = "<group>";
+		};
 		948E0900BCA51B8785095658 = {
 			isa = PBXGroup;
 			children = (
 				4CCC4034548A4D9E370AE0B3 /* Forma */,
+				DC1F9DC1D2642B6A01E0ADD8 /* FormaFinder */,
+				A334E0024CC25B0919236F24 /* FormaShare */,
+				7BBE1106888DDF29DDA6BED6 /* FormaTests */,
 				A91902B908C35C713400A946 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		A334E0024CC25B0919236F24 /* FormaShare */ = {
+			isa = PBXGroup;
+			children = (
+				CF368242F8BD58768B3B21E8 /* FormaShare.entitlements */,
+				14479E865C22452C7D3AAA45 /* Info.plist */,
+				3F2236CA13039B24E19C2D89 /* ShareView.swift */,
+				1C07F6AAC3738BFAD1B2E44A /* ShareViewController.swift */,
+			);
+			path = FormaShare;
 			sourceTree = "<group>";
 		};
 		A91902B908C35C713400A946 /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				264A9B73EE8314C55721F274 /* Forma.app */,
+				F3036E2FA086BE2224A50843 /* FormaFinder.appex */,
+				B8B9B301EADF5195095BD33A /* FormaShare.appex */,
+				4CA2F55BC6FF26452C6D9905 /* FormaTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -186,6 +336,16 @@
 			path = Resources;
 			sourceTree = "<group>";
 		};
+		DC1F9DC1D2642B6A01E0ADD8 /* FormaFinder */ = {
+			isa = PBXGroup;
+			children = (
+				15CE0FB9CCD4B633984A7504 /* FinderSync.swift */,
+				40640C0B35D7EE789489AC7B /* FormaFinder.entitlements */,
+				01578EFDB83DD79AB94375C5 /* Info.plist */,
+			);
+			path = FormaFinder;
+			sourceTree = "<group>";
+		};
 		EC08DE171DC5A8ABC066A450 /* Intents */ = {
 			isa = PBXGroup;
 			children = (
@@ -198,7 +358,6 @@
 			isa = PBXGroup;
 			children = (
 				52AFB9541834F5E67BCF3750 /* ClipboardRules.swift */,
-				0FE80EE95F1B0B002C727FB2 /* Formats.swift */,
 				76A573D7DECAA5A8A8DC6D34 /* History.swift */,
 				71EDD8B35978D30E8746D2B4 /* Output.swift */,
 				33D752FC2B42B27074D3681C /* Settings.swift */,
@@ -210,16 +369,36 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		0AC36A5518D7A2B39E3797C3 /* FormaFinder */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 71D64631CD0B9F191C0C79AD /* Build configuration list for PBXNativeTarget "FormaFinder" */;
+			buildPhases = (
+				DAF99E109EDE0582D0712430 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = FormaFinder;
+			packageProductDependencies = (
+			);
+			productName = FormaFinder;
+			productReference = F3036E2FA086BE2224A50843 /* FormaFinder.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		475DA89C102D7DDFFF38F053 /* Forma */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 4C5DD33CD199970FFC8F6CF4 /* Build configuration list for PBXNativeTarget "Forma" */;
 			buildPhases = (
 				C11816ED1343160C23D72171 /* Sources */,
 				E4BA11537780711623CF3F72 /* Resources */,
+				DD513CF023FA290F83B4FB93 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				49E00692EF4F639CF289CBCC /* PBXTargetDependency */,
+				80C9D302BBCC1E7CD3718BF0 /* PBXTargetDependency */,
 			);
 			name = Forma;
 			packageProductDependencies = (
@@ -227,6 +406,40 @@
 			productName = Forma;
 			productReference = 264A9B73EE8314C55721F274 /* Forma.app */;
 			productType = "com.apple.product-type.application";
+		};
+		483560AB35BC21A29EDC9B56 /* FormaShare */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 98C2024AFB85E4BD714FC97D /* Build configuration list for PBXNativeTarget "FormaShare" */;
+			buildPhases = (
+				D5469513B774278447506E0F /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = FormaShare;
+			packageProductDependencies = (
+			);
+			productName = FormaShare;
+			productReference = B8B9B301EADF5195095BD33A /* FormaShare.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		7828C4F81CF0691AF693C525 /* FormaTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7A5AD45DB3B556FCAFF37710 /* Build configuration list for PBXNativeTarget "FormaTests" */;
+			buildPhases = (
+				BF6C603B60A79671C1FC3047 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = FormaTests;
+			packageProductDependencies = (
+			);
+			productName = FormaTests;
+			productReference = 4CA2F55BC6FF26452C6D9905 /* FormaTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -237,8 +450,20 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					0AC36A5518D7A2B39E3797C3 = {
+						DevelopmentTeam = PG46BWSK3T;
+						ProvisioningStyle = Manual;
+					};
 					475DA89C102D7DDFFF38F053 = {
-						DevelopmentTeam = "";
+						DevelopmentTeam = PG46BWSK3T;
+						ProvisioningStyle = Manual;
+					};
+					483560AB35BC21A29EDC9B56 = {
+						DevelopmentTeam = PG46BWSK3T;
+						ProvisioningStyle = Manual;
+					};
+					7828C4F81CF0691AF693C525 = {
+						DevelopmentTeam = PG46BWSK3T;
 						ProvisioningStyle = Manual;
 					};
 				};
@@ -258,6 +483,9 @@
 			projectRoot = "";
 			targets = (
 				475DA89C102D7DDFFF38F053 /* Forma */,
+				0AC36A5518D7A2B39E3797C3 /* FormaFinder */,
+				483560AB35BC21A29EDC9B56 /* FormaShare */,
+				7828C4F81CF0691AF693C525 /* FormaTests */,
 			);
 		};
 /* End PBXProject section */
@@ -274,6 +502,20 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		BF6C603B60A79671C1FC3047 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A7570EFA554201B19E57A0C5 /* ExternalRequest.swift in Sources */,
+				9805F3A5F1F9A35AA850CC6F /* Formats.swift in Sources */,
+				FAF4AD3621D94D35496EAA04 /* GroupContainer.swift in Sources */,
+				D4F69455EABBBFFB74F9324B /* MenuBuilder.swift in Sources */,
+				8AEB33649C1432F72A96EEDF /* MenuBuilderTests.swift in Sources */,
+				9435E71ED57BED1081B2C824 /* MenuConfig.swift in Sources */,
+				4B55615B9D3F17EDC4F5D9E4 /* SharedTypes.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C11816ED1343160C23D72171 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -285,34 +527,89 @@
 				028E62E2965902B92612B440 /* ClipboardRules.swift in Sources */,
 				006275E62C2D0D18C7920BC4 /* ClipboardSettingsView.swift in Sources */,
 				65F28ECD5F4498BF2C06CB20 /* DocumentEngine.swift in Sources */,
+				50B82552E5B0F068CFA3634E /* ExtensionStatus.swift in Sources */,
+				D51929C115C5D637B81DC3C3 /* ExternalRequest.swift in Sources */,
 				AC5EDD85A73A52587F6E48A2 /* FileListView.swift in Sources */,
+				D5752133B287B4E40A82EE3D /* FinderSettingsView.swift in Sources */,
 				8E706B02336CB7945C5DF6E1 /* FormaApp.swift in Sources */,
 				5CFF4E1F7ADF9B341415B33B /* FormatPicker.swift in Sources */,
-				FDD214C31D065FE99D3A920F /* Formats.swift in Sources */,
+				A6B2831A227988E8234CCE07 /* Formats.swift in Sources */,
+				32844D72D86254BCF3BAECE7 /* GroupContainer.swift in Sources */,
 				DA927F868401F82436F5D949 /* History.swift in Sources */,
 				CC33FE33F57D544C6833D2D5 /* HistoryModel.swift in Sources */,
 				83ADAA8C4448835B6406C212 /* HistoryView.swift in Sources */,
 				400B984BB33687F03F654CE7 /* ImageEngine.swift in Sources */,
 				6DB5A7E9A2B09478D53B0D8B /* Intents.swift in Sources */,
+				1834F79B22EBA860A8516A4C /* JobCenter.swift in Sources */,
 				0AE66F87BE7F957F0822262D /* MainView.swift in Sources */,
 				4E34DC302F6657FC9FC5B762 /* MediaEngine.swift in Sources */,
 				87F54790512133CADBF582B3 /* MenuBarController.swift in Sources */,
 				2E89428BD570C7442531DCA6 /* MenuBarView.swift in Sources */,
+				1B6D214925E216D69FBE9B95 /* MenuBuilder.swift in Sources */,
+				6A24B388C5CB2B1ACF5E0C91 /* MenuConfig.swift in Sources */,
+				C7C1E9F9A098EF5E4837C74C /* MenuConfigPublisher.swift in Sources */,
 				CD05069128D45CB4B7128310 /* OfficeEngine.swift in Sources */,
 				594A701D974644A339D8FAF6 /* Output.swift in Sources */,
 				2D49157CE11285B771D5BC60 /* Pipeline.swift in Sources */,
 				AFD7F4494CEBC30F9CAC609B /* PreviewRenderer.swift in Sources */,
 				319445B93E6B400006248069 /* PreviewView.swift in Sources */,
+				7493D626E40ACC54169B791E /* ProgressHUD.swift in Sources */,
+				7340D65356224F68D98B71C2 /* Recipes.swift in Sources */,
+				3F42E72ABAC20B22158D5575 /* RequestPlanner.swift in Sources */,
+				2FB3DEA811A1BA4D3DC843F0 /* RequestRouter.swift in Sources */,
 				6157112E413718C34D00BA37 /* Services.swift in Sources */,
 				05B93CC417A97CE4A8239A9E /* Settings.swift in Sources */,
 				9F4EB9675CCD63650B0BE81B /* SettingsView.swift in Sources */,
+				5C3EEB74781EEC8E2B192E4E /* SharedTypes.swift in Sources */,
 				1E902E332E32617D8A7F638F /* Tools.swift in Sources */,
 				D77E8D4EE145F7F3D117F65E /* UpscaleViews.swift in Sources */,
 				F937CA317265E62AEC45049F /* Upscaler.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D5469513B774278447506E0F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9685AACA469F8479E9A0D3CA /* ExternalRequest.swift in Sources */,
+				D47B9908FA9755E883D655B1 /* Formats.swift in Sources */,
+				5C3948AAEFA6DE28DFED39EA /* GroupContainer.swift in Sources */,
+				9180A656C5AE522666CA8679 /* MenuBuilder.swift in Sources */,
+				45CB92AB3BC124C6816F8650 /* MenuConfig.swift in Sources */,
+				D73B5179EBAC4381C9319725 /* ShareView.swift in Sources */,
+				AA2189B8336D303D50571DB5 /* ShareViewController.swift in Sources */,
+				3AF642A717F9F981169B81E6 /* SharedTypes.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DAF99E109EDE0582D0712430 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				60DC6B55937159FC52CFBD91 /* ExternalRequest.swift in Sources */,
+				D90EB8B20712EADB1EBBC208 /* FinderSync.swift in Sources */,
+				096E6DF04C47B2FEBD998025 /* Formats.swift in Sources */,
+				E37261EAACF4858614F85517 /* GroupContainer.swift in Sources */,
+				476FFF3ADB935AC845A9C809 /* MenuBuilder.swift in Sources */,
+				D66B7D65C4999CC77B47FEEE /* MenuConfig.swift in Sources */,
+				8DDB47DE6EF46584A19FDD48 /* SharedTypes.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		49E00692EF4F639CF289CBCC /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0AC36A5518D7A2B39E3797C3 /* FormaFinder */;
+			targetProxy = 36B6665787AC84CD95BEE9A6 /* PBXContainerItemProxy */;
+		};
+		80C9D302BBCC1E7CD3718BF0 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 483560AB35BC21A29EDC9B56 /* FormaShare */;
+			targetProxy = D9A2A200B090CA1BCF02D1F7 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		04DBE4FCD63E51284514DA83 /* Release */ = {
@@ -348,10 +645,16 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "Developer ID Application";
+				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = PG46BWSK3T;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -361,8 +664,10 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.3;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
+				OTHER_CODE_SIGN_FLAGS = "--timestamp=none";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
@@ -370,6 +675,65 @@
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
+		};
+		082F2315D0B50BB419A4F879 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.thibault.forma.tests;
+				SDKROOT = macosx;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Release;
+		};
+		2769D32344659084CD352993 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = FormaShare/FormaShare.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = FormaShare/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.thibault.forma.Share;
+				PRODUCT_NAME = FormaShare;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Release;
+		};
+		600CBAA9B4B3BFF94594275A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = FormaFinder/FormaFinder.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = FormaFinder/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.thibault.forma.FinderMenu;
+				PRODUCT_NAME = FormaFinder;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Debug;
 		};
 		862B476AAE4D7F8A1523C157 /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -404,10 +768,16 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_IDENTITY = "Developer ID Application";
+				CODE_SIGN_STYLE = Manual;
 				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = PG46BWSK3T;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -423,14 +793,37 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.3;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
+				OTHER_CODE_SIGN_FLAGS = "--timestamp=none";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
-				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		885666C44CB0105E1462B9DE /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = FormaShare/FormaShare.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = FormaShare/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.thibault.forma.Share;
+				PRODUCT_NAME = FormaShare;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
 			};
 			name = Debug;
 		};
@@ -438,55 +831,77 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_IDENTITY = "-";
-				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_ENTITLEMENTS = Forma/Forma.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
-				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = "";
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = NO;
-				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Forma/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.thibault.forma;
 				PRODUCT_NAME = Forma;
 				SDKROOT = macosx;
-				SWIFT_OPTIMIZATION_LEVEL = "-O";
-				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
+		};
+		934F8F8A5DA3A5BE7730F45D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.thibault.forma.tests;
+				SDKROOT = macosx;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		C50F27AA06D27D4683DD689D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = FormaFinder/FormaFinder.entitlements;
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = FormaFinder/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.thibault.forma.FinderMenu;
+				PRODUCT_NAME = FormaFinder;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+			};
+			name = Release;
 		};
 		EDB6632A8469001177A204AF /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_IDENTITY = "-";
-				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_ENTITLEMENTS = Forma/Forma.entitlements;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
-				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = "";
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = NO;
-				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Forma/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.thibault.forma;
 				PRODUCT_NAME = Forma;
 				SDKROOT = macosx;
-				SWIFT_OPTIMIZATION_LEVEL = "-O";
-				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
 		};
@@ -502,11 +917,38 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
+		71D64631CD0B9F191C0C79AD /* Build configuration list for PBXNativeTarget "FormaFinder" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				600CBAA9B4B3BFF94594275A /* Debug */,
+				C50F27AA06D27D4683DD689D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		7A5AD45DB3B556FCAFF37710 /* Build configuration list for PBXNativeTarget "FormaTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				934F8F8A5DA3A5BE7730F45D /* Debug */,
+				082F2315D0B50BB419A4F879 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		8FD58A32398795DA0B3AFD8C /* Build configuration list for PBXProject "Forma" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				862B476AAE4D7F8A1523C157 /* Debug */,
 				04DBE4FCD63E51284514DA83 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		98C2024AFB85E4BD714FC97D /* Build configuration list for PBXNativeTarget "FormaShare" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				885666C44CB0105E1462B9DE /* Debug */,
+				2769D32344659084CD352993 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

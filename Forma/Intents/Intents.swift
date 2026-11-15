@@ -141,6 +141,72 @@ struct UpscaleImagesIntent: AppIntent {
     }
 }
 
+// MARK: - Recipes, undo, clipboard (Forma 1.3)
+
+struct RecipeOptionsProvider: DynamicOptionsProvider {
+    func results() async throws -> [String] { PreferencesStore.loadSnapshot().recipes.map(\.name) }
+}
+
+struct ApplyRecipeIntent: AppIntent {
+    static let title: LocalizedStringResource = "Appliquer une recette Forma"
+    static let description = IntentDescription("Applique une recette (format, qualité, taille, métadonnées, destination) à des fichiers.")
+    static let openAppWhenRun = false
+
+    @Parameter(title: "Fichiers", supportedContentTypes: [.item])
+    var files: [IntentFile]
+
+    @Parameter(title: "Recette", optionsProvider: RecipeOptionsProvider())
+    var recipe: String
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("Appliquer \(\.$recipe) à \(\.$files)")
+    }
+
+    func perform() async throws -> some IntentResult & ReturnsValue<[IntentFile]> {
+        let prefs = PreferencesStore.loadSnapshot()
+        guard let r = prefs.recipes.named(recipe) else { throw ToolError("Recette inconnue : \(recipe)") }
+        var request = ExternalRequest(source: .shortcut, action: .recipe, paths: try IntentRunner.urls(from: files).map(\.path))
+        request.recipe = r.id
+        let plan = try RequestPlanner.plan(request, prefs: prefs)
+        var out: [IntentFile] = []
+        let batch = UUID()
+        for (i, f) in plan.files.enumerated() {
+            let res = try await Pipeline.run(input: f.url, mode: plan.mode, snapshot: plan.snapshot, index: i + 1, targetOverride: f.target,
+                                             outputFolder: f.outputFolder, origin: .shortcut, batch: batch) { _ in }
+            out += (res.outputs.isEmpty ? [f.url] : res.outputs).map { IntentFile(fileURL: $0, filename: $0.lastPathComponent, type: UTType(filenameExtension: $0.pathExtension)) }
+        }
+        return .result(value: out)
+    }
+}
+
+struct UndoLastBatchIntent: AppIntent {
+    static let title: LocalizedStringResource = "Annuler le dernier traitement Forma"
+    static let description = IntentDescription("Met les derniers résultats à la Corbeille et remet les originaux en place.")
+    static let openAppWhenRun = false
+
+    func perform() async throws -> some IntentResult & ReturnsValue<String> {
+        let all = HistoryStore.shared.fetch()
+        guard let first = all.first(where: { !$0.isUndone }) else { return .result(value: "Rien à annuler.") }
+        let batch = first.batch.map { b in all.filter { $0.batch == b && !$0.isUndone } } ?? [first]
+        var done: [UUID] = []
+        for e in batch { if (try? HistoryUndo.undo(e)) != nil { done.append(e.id) } }
+        HistoryStore.shared.markUndone(done)
+        return .result(value: "\(done.count) traitement\(done.count > 1 ? "s" : "") annulé\(done.count > 1 ? "s" : "").")
+    }
+}
+
+struct OptimizeClipboardIntent: AppIntent {
+    static let title: LocalizedStringResource = "Optimiser le presse-papiers avec Forma"
+    static let description = IntentDescription("Applique les règles de l'optimiseur à l'image du presse-papiers.")
+    static let openAppWhenRun = false
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        ClipboardOptimizer.shared.optimizeNow()
+        return .result()
+    }
+}
+
 struct FormaShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(intent: ConvertFilesIntent(), phrases: ["Convertir avec \(.applicationName)", "Convert files with \(.applicationName)"],
@@ -149,5 +215,11 @@ struct FormaShortcuts: AppShortcutsProvider {
                     shortTitle: "Compresser", systemImageName: "arrow.down.right.and.arrow.up.left")
         AppShortcut(intent: UpscaleImagesIntent(), phrases: ["Agrandir avec \(.applicationName)", "Upscale images with \(.applicationName)"],
                     shortTitle: "Agrandir ×2", systemImageName: "sparkles")
+        AppShortcut(intent: ApplyRecipeIntent(), phrases: ["Appliquer une recette \(.applicationName)", "Apply a \(.applicationName) recipe"],
+                    shortTitle: "Recette", systemImageName: "wand.and.stars")
+        AppShortcut(intent: UndoLastBatchIntent(), phrases: ["Annuler le dernier traitement \(.applicationName)", "Undo last \(.applicationName) batch"],
+                    shortTitle: "Annuler", systemImageName: "arrow.uturn.backward")
+        AppShortcut(intent: OptimizeClipboardIntent(), phrases: ["Optimiser le presse-papiers avec \(.applicationName)"],
+                    shortTitle: "Presse-papiers", systemImageName: "doc.on.clipboard")
     }
 }

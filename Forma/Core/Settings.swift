@@ -3,47 +3,6 @@ import SwiftUI
 
 // MARK: - Image settings
 
-enum CompressionPreset: String, Codable, CaseIterable, Identifiable, Sendable {
-    case maximumQuality = "maximum_quality", highQuality = "high_quality", balanced, webOptimized = "web_optimized"
-    case socialMedia = "social_media", maximumCompression = "maximum_compression", custom
-    var id: String { rawValue }
-    var label: String {
-        switch self {
-        case .maximumQuality: "Qualité maximale"
-        case .highQuality: "Haute qualité"
-        case .balanced: "Équilibré"
-        case .webOptimized: "Optimisé web"
-        case .socialMedia: "Réseaux sociaux"
-        case .maximumCompression: "Compression maximale"
-        case .custom: "Personnalisé"
-        }
-    }
-    var detail: String {
-        switch self {
-        case .maximumQuality: "Archivage, impression, masters"
-        case .highQuality: "Sites pro et portfolios"
-        case .balanced: "Usage web général, documentation"
-        case .webOptimized: "Sites au chargement rapide"
-        case .socialMedia: "Instagram, X, Facebook (≤ 2048 px)"
-        case .maximumCompression: "E-mails, connexions lentes"
-        case .custom: "Qualité choisie manuellement"
-        }
-    }
-    /// Quality 0…100
-    func quality(custom: Int) -> Int {
-        switch self {
-        case .maximumQuality: 92
-        case .highQuality: 85
-        case .balanced: 78
-        case .webOptimized: 70
-        case .socialMedia: 75
-        case .maximumCompression: 55
-        case .custom: custom
-        }
-    }
-    var maxDimension: Int? { self == .socialMedia ? 2048 : nil }
-}
-
 enum ResizeMode: String, Codable, CaseIterable, Identifiable, Sendable {
     case none, fit, width, height, exact, fill, percent
     var id: String { rawValue }
@@ -67,25 +26,6 @@ enum ResizeMode: String, Codable, CaseIterable, Identifiable, Sendable {
         case .exact: "Tient dans les dimensions exactes, avec un fond pour compléter."
         case .fill: "Étire/compresse aux dimensions exactes (peut déformer)."
         case .percent: "Met l'image à l'échelle d'un pourcentage."
-        }
-    }
-}
-
-enum MetadataMode: String, Codable, CaseIterable, Identifiable, Sendable {
-    case keepAll, keepEssential, stripAll
-    var id: String { rawValue }
-    var label: String {
-        switch self {
-        case .keepAll: "Tout conserver"
-        case .keepEssential: "Essentiel seulement"
-        case .stripAll: "Tout supprimer"
-        }
-    }
-    var help: String {
-        switch self {
-        case .keepAll: "Conserve EXIF, GPS, auteur, profil colorimétrique."
-        case .keepEssential: "Garde date, appareil, copyright et profil couleur ; retire le GPS et le reste."
-        case .stripAll: "Fichiers les plus légers, sans appareil, date ni copyright."
         }
     }
 }
@@ -449,33 +389,6 @@ struct NamedPreset<T: Codable & Equatable & Sendable>: Codable, Equatable, Ident
 
 // MARK: - Watched folders / schedule
 
-enum ProcessMode: String, Codable, CaseIterable, Identifiable, Sendable {
-    case convert, compress, upscale
-    var id: String { rawValue }
-    var label: String {
-        switch self {
-        case .convert: "Convertir"
-        case .compress: "Compresser"
-        case .upscale: "Agrandir"
-        }
-    }
-    var symbol: String {
-        switch self {
-        case .convert: "arrow.triangle.2.circlepath"
-        case .compress: "arrow.down.right.and.arrow.up.left"
-        case .upscale: "arrow.up.left.and.arrow.down.right"
-        }
-    }
-    /// Past participle used in summaries and notifications.
-    var doneLabel: String {
-        switch self {
-        case .convert: "Conversion terminée"
-        case .compress: "Compression terminée"
-        case .upscale: "Agrandissement terminé"
-        }
-    }
-}
-
 struct WatchedFolder: Codable, Equatable, Identifiable, Sendable {
     var id = UUID()
     var path: String
@@ -593,6 +506,53 @@ struct Preferences: Codable, Equatable, Sendable {
 
     var historyEnabled = true
     var historyRetentionDays = 90   // 0 = forever
+
+    // Forma 1.3: Finder & Share integration, recipes.
+    var finder = FinderPreferences()
+    var recipes: [Recipe] = Recipe.examples
+}
+
+/// How jobs started outside the main window report progress.
+enum JobFeedback: String, Codable, CaseIterable, Identifiable, Sendable {
+    case hud, notification, silent
+    var id: String { rawValue }
+    var label: String {
+        switch self {
+        case .hud: "Panneau de progression"
+        case .notification: "Notification à la fin"
+        case .silent: "Rien (icône de la barre des menus)"
+        }
+    }
+}
+
+/// Settings of the Finder menu, the Share extension and the Services (Settings › Finder).
+struct FinderPreferences: Codable, Equatable, Sendable {
+    var enabled = true
+    var favorites: [String: [String]] = MenuConfig.defaultFavorites
+    var rankByHabits = true
+    var showCompress = true
+    var showCompressPresets = true
+    var showUpscale = true
+    var showRecipes = true
+    var showUndo = true
+    var showOpenInForma = true
+    var showIcons = true
+    var topLevelCount = 0
+    /// Where results of Finder / Share / Services jobs go (`.standard` = the Output settings).
+    var destination: RequestDestination = .standard
+    var feedback: JobFeedback = .hud
+    var revealWhenDone = false
+    /// Results of items shared without a file on disk (Safari, Photos…). nil = Downloads.
+    var sharesFolder: String? = nil
+    /// "Mode discret": no Dock icon while no Forma window is open.
+    var hideDockIconWithoutWindows = false
+
+    func favorites(for kind: MediaKind) -> [String] { favorites[kind.rawValue] ?? MenuConfig.defaultFavorites[kind.rawValue] ?? [] }
+
+    var sharesFolderURL: URL {
+        sharesFolder.map { URL(fileURLWithPath: $0, isDirectory: true) }
+            ?? FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0]
+    }
 }
 
 @MainActor

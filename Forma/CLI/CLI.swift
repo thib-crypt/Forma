@@ -1,8 +1,9 @@
 import Foundation
+import AppKit
 
 /// `forma` command-line interface (the app binary itself, symlinked into /usr/local/bin).
 enum CLI {
-    static let commands: Set<String> = ["convert", "compress", "upscale", "formats", "tools", "help", "--help", "-h", "--version", "version", "info", "history", "undo", "optimize"]
+    static let commands: Set<String> = ["convert", "compress", "upscale", "formats", "tools", "help", "--help", "-h", "--version", "version", "info", "history", "undo", "optimize", "request", "run", "finder"]
 
     static func shouldHandle(_ args: [String]) -> Bool {
         guard args.count > 1 else { return false }
@@ -29,6 +30,9 @@ enum CLI {
         case "history": return history(rest)
         case "optimize": return optimize(rest)
         case "undo": return undo(rest)
+        case "request": return request(rest)
+        case "run": return runRecipe(rest)
+        case "finder": return finder(rest)
         case "info":
             for p in rest {
                 let u = URL(fileURLWithPath: p)
@@ -305,6 +309,210 @@ enum CLI {
         return failures == 0 ? 0 : 1
     }
 
+    // MARK: Background requests (same path as the Finder menu)
+
+    /// `forma request <convert|compress|upscale|recipe|open|undo|clipboard> [options] <fichiers…>`
+    /// Writes a request into the App Group inbox and wakes Forma, exactly like the Finder extension does.
+    static func request(_ args: [String]) -> Int32 {
+        var it = args.makeIterator()
+        guard let verb = it.next() else { fputs(requestUsage, stderr); return 2 }
+        var r = ExternalRequest(source: .cli)
+        switch verb {
+        case "convert": r.mode = .convert
+        case "compress": r.mode = .compress
+        case "upscale": r.mode = .upscale
+        case "recipe": r.action = .recipe
+        case "open": r.action = .open
+        case "undo": r.action = .undo
+        case "clipboard": r.action = .clipboard
+        case "watch": r.action = .watch
+        default: fputs(requestUsage, stderr); return 2
+        }
+        let prefs = PreferencesStore.loadSnapshot()
+        var o = RequestOverrides()
+        while let a = it.next() {
+            switch a {
+            case "--to", "-t":
+                guard let v = it.next(), let f = FormatCatalog.resolve(v) else { fputs("Format inconnu.\n", stderr); return 2 }
+                r.target = f.id
+            case "--recipe", "--name":
+                guard let v = it.next(), let rec = prefs.recipes.named(v) else { fputs("Recette inconnue. Voir `forma run --list`.\n", stderr); return 2 }
+                r.recipe = rec.id
+            case "--preset", "-p":
+                guard let v = it.next(), let p = CompressionPreset(rawValue: v.replacingOccurrences(of: "-", with: "_")) else { return 2 }
+                o.preset = p
+            case "--quality", "-q": o.quality = it.next().flatMap(Int.init)
+            case "--max": o.maxDimension = it.next().flatMap(Int.init)
+            case "--dest":
+                guard let v = it.next() else { return 2 }
+                r.destination = v == "alongside" ? .alongside : v == "clipboard" ? .clipboard : v == "default" ? .standard
+                    : .folder((v as NSString).expandingTildeInPath)
+            case "--only":
+                r.kinds = it.next()?.split(separator: ",").compactMap { MediaKind(rawValue: String($0)) }
+            case "--no-recursive": r.recursive = false
+            case "--reveal": r.reveal = true
+            case "--batch": r.batch = it.next().flatMap(UUID.init(uuidString:))
+            default:
+                if a.hasPrefix("-") { fputs("Option inconnue : \(a)\n", stderr); return 2 }
+                r.paths.append(URL(fileURLWithPath: (a as NSString).expandingTildeInPath).standardizedFileURL.path)
+            }
+        }
+        if !o.isEmpty { r.overrides = o }
+        if r.action == .recipe, r.recipe == nil { fputs("Précisez --recipe <nom>.\n", stderr); return 2 }
+        if [.process, .recipe, .open, .watch].contains(r.action), r.paths.isEmpty { fputs("Aucun fichier.\n", stderr); return 2 }
+        do {
+            guard let inbox = GroupContainer.inbox, let url = GroupContainer.requestURL(r.id) else { throw GroupContainer.GroupError.unavailable }
+            try FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: true)
+            try RequestCodec.encode(r).write(to: url, options: .atomic)
+        } catch {
+            fputs("✗ \(error.localizedDescription)\n", stderr); return 1
+        }
+        // Wait for Launch Services to deliver the URL before this process exits.
+        let sem = DispatchSemaphore(value: 0)
+        let config = NSWorkspace.OpenConfiguration()
+        config.activates = false
+        config.addsToRecentItems = false
+        config.arguments = ["--headless"]
+        let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: GroupContainer.appBundleID) ?? URL(fileURLWithPath: "/Applications/Forma.app")
+        nonisolated(unsafe) var failure: Error?
+        NSWorkspace.shared.open([GroupContainer.jobURL(r.id)], withApplicationAt: app, configuration: config) { _, e in failure = e; sem.signal() }
+        _ = sem.wait(timeout: .now() + 15)
+        if let failure { fputs("✗ \(failure.localizedDescription)\n", stderr); return 1 }
+        print("→ demande \(r.id.uuidString.prefix(8)) envoyée à Forma (\(app.path))")
+        return 0
+    }
+
+    static let requestUsage = """
+    forma request <convert|compress|upscale|recipe|open|undo|clipboard|watch> [options] <fichiers…>
+      --to <fmt>  --recipe <nom>  --preset <nom>  -q <1-100>  --max <px>
+      --dest alongside|clipboard|default|<dossier>  --only image,video,…  --no-recursive  --reveal
+
+    """
+
+    /// `forma run <recette> <fichiers…> [--json]` — applies a recipe in this process. `forma run --list` lists them.
+    static func runRecipe(_ args: [String]) -> Int32 {
+        let prefs = PreferencesStore.loadSnapshot()
+        guard let name = args.first, name != "--list" else {
+            if prefs.recipes.isEmpty { print("Aucune recette (Réglages › Finder › Recettes).") }
+            for r in prefs.recipes { print("• \(r.name.padding(toLength: 14, withPad: " ", startingAt: 0)) \(r.detail)") }
+            return 0
+        }
+        guard let recipe = prefs.recipes.named(name) else { fputs("Recette inconnue : \(name). Voir `forma run --list`.\n", stderr); return 2 }
+        let json = args.contains("--json")
+        let paths = args.dropFirst().filter { !$0.hasPrefix("--") }.map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath).standardizedFileURL.path }
+        guard !paths.isEmpty else { fputs("forma run <recette> <fichiers…> [--json]\n", stderr); return 2 }
+        var r = ExternalRequest(source: .cli, action: .recipe, paths: paths)
+        r.recipe = recipe.id
+        let plan: JobPlan
+        do { plan = try RequestPlanner.plan(r, prefs: prefs) } catch { fputs("✗ \(error.localizedDescription)\n", stderr); return 1 }
+        guard !plan.files.isEmpty else {
+            if json { print("[]") }
+            fputs("Aucun fichier compatible avec la recette « \(recipe.name) ».\n", stderr); return 1
+        }
+        if !json { print("\(plan.title) · \(plan.files.count) fichier\(plan.files.count > 1 ? "s" : "")\(plan.ignored > 0 ? " (\(plan.ignored) ignoré(s))" : "")") }
+        let sem = DispatchSemaphore(value: 0)
+        nonisolated(unsafe) var failures: Int32 = 0
+        nonisolated(unsafe) var report: [[String: Any]] = []
+        let batch = UUID()
+        Task.detached {
+            let width = plan.mode == .upscale ? 2 : SystemInfo.imageParallelism(requested: 0)
+            await withTaskGroup(of: (URL, Result<PipelineResult, Error>, TimeInterval).self) { group in
+                var iterator = plan.files.enumerated().makeIterator()
+                func add() {
+                    guard let (i, f) = iterator.next() else { return }
+                    group.addTask {
+                        let t = Date()
+                        do {
+                            let res = try await Pipeline.run(input: f.url, mode: plan.mode, snapshot: plan.snapshot, index: i + 1, targetOverride: f.target,
+                                                             outputFolder: f.outputFolder, origin: .cli, batch: batch) { _ in }
+                            return (f.url, .success(res), Date().timeIntervalSince(t))
+                        } catch { return (f.url, .failure(error), Date().timeIntervalSince(t)) }
+                    }
+                }
+                for _ in 0..<width { add() }
+                while let (u, res, t) = await group.next() {
+                    if json { report.append(resultJSON(u, res, t, mode: plan.mode)) }
+                    switch res {
+                    case .success(let out):
+                        if !json { print(out.outputs.isEmpty ? "• \(u.lastPathComponent): \(out.note ?? "inchangé")" : "✓ \(u.lastPathComponent) → \(out.outputs.map(\.lastPathComponent).joined(separator: ", ")) · \(out.outputSize.formattedBytes)") }
+                    case .failure(let e):
+                        failures += 1
+                        if !json { fputs("✗ \(u.lastPathComponent): \(e.localizedDescription)\n", stderr) }
+                    }
+                    add()
+                }
+            }
+            sem.signal()
+        }
+        sem.wait()
+        if json { printJSON(report) }
+        return failures == 0 ? 0 : 1
+    }
+
+    /// `forma finder status|enable|disable|reset|menu [--container|--toolbar] <fichiers…>`
+    static func finder(_ args: [String]) -> Int32 {
+        switch args.first ?? "status" {
+        case "status":
+            for id in [ExtensionStatus.finderID, ExtensionStatus.shareID] {
+                let s = ExtensionStatus.query(id)
+                print("\(s.state == .enabled ? "✓" : "✗") \(id) — \(s.label)\(s.version.map { " · \($0)" } ?? "")")
+                if let p = s.path { print("    chargée : \(p)") }
+                for o in s.otherPaths { print("    autre copie enregistrée : \(o)") }
+            }
+            if let url = GroupContainer.menuConfigURL {
+                let m = url.modificationDate.map { ISO8601DateFormatter().string(from: $0) } ?? "absent"
+                print("menu.json : \(url.path) (\(m))")
+            }
+            print("demandes en attente : \(GroupContainer.pendingRequests().count)")
+            return 0
+        case "enable":
+            ExtensionStatus.setEnabled(ExtensionStatus.finderID, true); ExtensionStatus.setEnabled(ExtensionStatus.shareID, true)
+            print("Extensions activées."); return 0
+        case "disable":
+            ExtensionStatus.setEnabled(ExtensionStatus.finderID, false); ExtensionStatus.setEnabled(ExtensionStatus.shareID, false)
+            print("Extensions désactivées."); return 0
+        case "reset":
+            ExtensionStatus.reset().forEach { print($0) }
+            return 0
+        case "menu":
+            let rest = Array(args.dropFirst())
+            let place: MenuPlace = rest.contains("--container") ? .container : rest.contains("--toolbar") ? .toolbar : .items
+            let urls = rest.filter { !$0.hasPrefix("--") }.map { p -> URL in
+                let path = (p as NSString).expandingTildeInPath
+                var isDir: ObjCBool = false
+                FileManager.default.fileExists(atPath: path, isDirectory: &isDir)
+                return URL(fileURLWithPath: path, isDirectory: isDir.boolValue)
+            }
+            let config = MenuConfigStore.Reader().config
+            let t = Date()
+            let nodes = MenuBuilder.build(MenuBuilder.summarize(urls), config: config, place: place)
+            let ms = Date().timeIntervalSince(t) * 1000
+            if nodes.isEmpty { print("(aucun menu Forma pour cette sélection)") }
+            func dump(_ n: MenuNode, _ depth: Int) {
+                let pad = String(repeating: "   ", count: depth)
+                switch n {
+                case .separator: print(pad + "─────────")
+                case .header(let t): print(pad + "[\(t)]")
+                case .item(let t, _, let e):
+                    var d = e.action.rawValue
+                    if e.action == .process { d += " \(e.mode.rawValue)" + (e.target.map { " → \($0)" } ?? "") }
+                    if let k = e.kinds { d += " [\(k.map(\.rawValue).joined(separator: ","))]" }
+                    if let p = e.preset { d += " preset=\(p.rawValue)" }
+                    print(pad + t + "    · " + d)
+                case .submenu(let t, _, let c):
+                    print(pad + t + " ▸")
+                    c.forEach { dump($0, depth + 1) }
+                }
+            }
+            nodes.forEach { dump($0, 0) }
+            print(String(format: "(%d éléments analysés en %.2f ms)", urls.count, ms))
+            return 0
+        default:
+            fputs("forma finder status|enable|disable|reset|menu [--container|--toolbar] <fichiers…>\n", stderr)
+            return 2
+        }
+    }
+
     static let usage = """
     forma — convertisseur & compresseur local (images, vidéo, audio, PDF, documents)
 
@@ -334,5 +542,12 @@ enum CLI {
 
       forma optimize <images…> [--app <bundle id>] [--force] [-o <dossier>] [--json]
                                applique les règles de l'optimiseur de presse-papiers
+
+    RECETTES & INTÉGRATION FINDER
+      forma run <recette> <fichiers…> [--json]   applique une recette (forma run --list)
+      forma request <convert|compress|upscale|recipe|open|undo|clipboard> [options] <fichiers…>
+                               confie le travail à Forma en arrière-plan, comme le menu du Finder
+      forma finder status|enable|disable|reset   état des extensions Finder et Partager
+      forma finder menu [--container|--toolbar] <fichiers…>   affiche le menu Finder pour ces fichiers
     """
 }

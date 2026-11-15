@@ -192,11 +192,14 @@ final class AppModel {
         let override = item.targetOverride.flatMap(FormatCatalog.format)
         let throttle = ProgressThrottle()
         do {
-            let result = try await Pipeline.run(input: url, mode: mode, snapshot: snapshot, index: index, targetOverride: override,
-                                                origin: origin, batch: batch) { p in
-                guard throttle.shouldEmit(p) else { return }
-                Task { @MainActor in if case .processing = item.status { item.status = .processing(max(0.02, p)) } }
-            }
+            // Shared slots with JobCenter: a Finder job and this batch never double the load.
+            let result = try await WorkLimits.run(item.kind) {
+                try await Pipeline.run(input: url, mode: mode, snapshot: snapshot, index: index, targetOverride: override,
+                                       origin: origin, batch: batch) { p in
+                    guard throttle.shouldEmit(p) else { return }
+                    Task { @MainActor in if case .processing = item.status { item.status = .processing(max(0.02, p)) } }
+                }
+            }.get()
             item.outputs = result.outputs
             item.outputSize = result.outputSize
             item.note = result.note

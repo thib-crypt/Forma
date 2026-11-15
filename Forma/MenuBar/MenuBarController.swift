@@ -107,8 +107,9 @@ final class MenuBarController: NSObject {
 
     private func refreshIcon() {
         let model = AppModel.shared
-        let running = model.isRunning
-        let progress = running ? model.overallProgress : 0
+        let jobs = JobCenter.shared
+        let running = model.isRunning || jobs.isBusy
+        let progress = model.isRunning ? model.overallProgress : jobs.isBusy ? jobs.overallProgress : 0
         let steps = Int((progress * 60).rounded())
         let key = "\(running)-\(model.isPaused)-\(steps)-\(state.iconTargeted)"
         guard let button = statusItem?.button, key != lastIconKey else { return }
@@ -143,6 +144,21 @@ final class MenuBarController: NSObject {
         add("Ouvrir Forma", "macwindow") { AppDelegate.showMainWindow() }
         add("Historique", "clock.arrow.circlepath") { AppDelegate.showHistory() }
         add("Réglages…", "gearshape", key: ",") { AppDelegate.showSettings() }
+        let recipes = PreferencesStore.shared.prefs.recipes.filter(\.showInMenuBar)
+        if !recipes.isEmpty {
+            menu.addItem(.separator())
+            let parent = NSMenuItem(title: "Recettes", action: nil, keyEquivalent: "")
+            parent.image = NSImage(systemSymbolName: "list.bullet.rectangle", accessibilityDescription: nil)
+            let sub = NSMenu()
+            for r in recipes {
+                let item = ClosureMenuItem(title: "\(r.name)…", keyEquivalent: "") { MenuBarController.shared.apply(recipe: r) }
+                item.image = NSImage(systemSymbolName: r.symbol, accessibilityDescription: nil)
+                item.toolTip = r.detail
+                sub.addItem(item)
+            }
+            parent.submenu = sub
+            menu.addItem(parent)
+        }
         menu.addItem(.separator())
         let undo = ClosureMenuItem(title: "Annuler le dernier traitement", keyEquivalent: "") { HistoryModel.shared.undoLastBatch() }
         undo.image = NSImage(systemSymbolName: "arrow.uturn.backward", accessibilityDescription: nil)
@@ -412,21 +428,42 @@ final class MenuBarController: NSObject {
 
     // MARK: Accepting files
 
-    /// Adds dropped files to the given mode and starts processing right away.
+    /// Processes dropped files right away in the background queue (`JobCenter`), so a drop that arrives while
+    /// something else runs waits its turn instead of staying "pending" forever.
     @discardableResult
     func accept(_ urls: [URL], mode: ProcessMode) -> Bool {
         droppedDuringDrag = true
-        let files = urls.filter(\.isFileURL)
-        let added = AppModel.shared.add(files, mode: mode, autoStart: true)
+        let files = Pipeline.expand(urls.filter(\.isFileURL))
+            .filter { mode != .upscale || FileDetection.classify($0).mediaKind == .image }
+        let added = files.count
+        if added > 0 {
+            JobCenter.shared.submit(ExternalRequest(source: .menuBar, mode: mode, paths: files.map(\.path)))
+        }
         if added == 0 {
             NSSound.beep()
             let reason = mode == .upscale ? "Aucune image à agrandir" : "Rien de nouveau à traiter"
             post(.init(text: reason, symbol: "exclamationmark.circle", isError: true))
             return false
         }
-        let noun = added > 1 ? "\(added) fichiers ajoutés" : "1 fichier ajouté"
+        let noun = added > 1 ? "\(added) fichiers" : "1 fichier"
         post(.init(text: "\(noun) · \(mode.label)", symbol: "checkmark.circle.fill"))
         return true
+    }
+
+    /// Status item menu › Recettes › X…: choose files, then run the recipe in the background.
+    func apply(recipe: Recipe) {
+        NSApp.activate()
+        let picker = NSOpenPanel()
+        picker.allowsMultipleSelection = true
+        picker.canChooseDirectories = true
+        picker.canChooseFiles = true
+        picker.message = "Fichiers à traiter avec la recette « \(recipe.name) » — \(recipe.detail)"
+        picker.prompt = "Appliquer"
+        guard picker.runModal() == .OK else { return }
+        var r = ExternalRequest(source: .menuBar, action: .recipe, paths: picker.urls.map(\.path))
+        r.recipe = recipe.id
+        JobCenter.shared.submit(r)
+        open(animated: true)
     }
 
     /// Tile click: pick files with an open panel, then process them like a drop.
