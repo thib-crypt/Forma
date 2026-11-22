@@ -46,7 +46,7 @@ sans qu'aucune fenêtre de Forma ne s'ouvre. Même chose depuis le menu **Partag
   `Apple Development`. Donc App Group possible, sans profil de provisionnement.
 - Bureau et Documents ne sont **pas** dans iCloud Drive. OneDrive est installé (`~/Library/CloudStorage/OneDrive-Personnel`).
 - Extensions Finder Sync déjà présentes : CleanMyMac (active), OneDrive. Elles cohabitent sans problème.
-- Picmal n'embarque aucune extension : cette intégration irait plus loin que le modèle d'origine.
+- Cette intégration au Finder est un point fort de Forma.
 
 ---
 

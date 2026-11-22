@@ -1,7 +1,7 @@
 # Forma
 
-Native macOS converter and compressor (SwiftUI, macOS 26, Apple Silicon), modeled on the *features* of Picmal
-(analyzed with REA: bundle, App Intents, binary strings). Original code, design and icon; nothing copied from Picmal.
+Native macOS converter and compressor (SwiftUI, macOS 26, Apple Silicon) for images, video, audio, PDF and documents,
+built into the Finder, the Share menu, Shortcuts and the command line. Independent project: original code, design and icon.
 
 **Requires** macOS 26 (Tahoe) · Apple Silicon. UI in French.
 
