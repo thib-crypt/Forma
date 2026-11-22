@@ -19,6 +19,10 @@ struct MenuBarView: View {
             DropHint()
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
+                .padding(.bottom, DropServer.isConfigured(PreferencesStore.shared.prefs.drop) ? 8 : 12)
+
+            DropStrip()
+                .padding(.horizontal, 12)
                 .padding(.bottom, 12)
 
             if model.isRunning || model.lastBatchSummary != nil {
@@ -65,13 +69,25 @@ private struct MenuBarHeader: View {
     @Environment(AppModel.self) private var model
     @Environment(MenuBarState.self) private var state
 
+    private var jobs: JobCenter { JobCenter.shared }
+
     private var status: String {
         if model.isRunning, let m = model.runningMode {
             let list = model.items(for: m)
             let done = list.filter(\.status.isFinished).count
             return model.isPaused ? "En pause · \(done) / \(list.count)" : "\(m.label) · \(done) / \(list.count)"
         }
+        // Drops on the panel, Finder and Share requests run in JobCenter, not in the window's batch.
+        if let job = jobs.active {
+            let waiting = jobs.queued.count
+            return "\(job.title) · \(job.processed) / \(job.total)" + (waiting > 0 ? " · +\(waiting)" : "")
+        }
         return "Prêt"
+    }
+
+    private var dotColor: Color {
+        if model.isRunning { return model.isPaused ? .orange : .accentColor }
+        return jobs.isBusy ? .accentColor : .green
     }
 
     var body: some View {
@@ -85,11 +101,13 @@ private struct MenuBarHeader: View {
                 Text("Forma").font(.system(size: 13, weight: .semibold))
                 HStack(spacing: 5) {
                     Circle()
-                        .fill(model.isRunning ? (model.isPaused ? Color.orange : Color.accentColor) : Color.green)
+                        .fill(dotColor)
                         .frame(width: 6, height: 6)
                     Text(status)
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
                         .contentTransition(.numericText())
                         .monospacedDigit()
                 }
@@ -118,6 +136,10 @@ private struct MenuBarHeader: View {
                         HistoryModel.shared.undoLastBatch()
                     }
                     .disabled(HistoryModel.shared.lastUndoableBatch.isEmpty)
+                    Divider()
+                    Toggle("Afficher dans le Dock", systemImage: "dock.rectangle", isOn: Binding(
+                        get: { PreferencesStore.shared.prefs.dockIcon == .always },
+                        set: { PreferencesStore.shared.prefs.dockIcon = $0 ? .always : .never }))
                     Divider()
                     Button("Quitter Forma", systemImage: "power") { NSApp.terminate(nil) }
                 } label: {
@@ -328,6 +350,63 @@ private struct DropHint: View {
     }
 }
 
+// MARK: - Drop strip
+
+/// "Envoyer sur Drop": a slim drop target under the three tiles (only once Drop is configured).
+private struct DropStrip: View {
+    @Environment(PreferencesStore.self) private var store
+    @Environment(MenuBarState.self) private var state
+    @State private var targeted = false
+    @State private var hovering = false
+
+    private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: 12, style: .continuous) }
+    private let tint = Color.orange
+
+    var body: some View {
+        if DropServer.isConfigured(store.prefs.drop) {
+            HStack(spacing: 10) {
+                ZStack {
+                    Circle().fill(tint.opacity(targeted ? 0.32 : 0.15)).frame(width: 28, height: 28)
+                    Image(systemName: targeted ? "arrow.down" : "arrow.up")
+                        .font(.system(size: 12, weight: .bold)).foregroundStyle(tint)
+                        .contentTransition(.symbolEffect(.replace))
+                }
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Envoyer sur Drop").font(.system(size: 12, weight: .semibold))
+                    Text(targeted ? "Relâchez pour obtenir le lien" : "Le lien est copié · \(store.prefs.drop.expiry == .never ? "sans expiration" : "expire dans \(store.prefs.drop.expiry.label)")")
+                        .font(.system(size: 10.5)).foregroundStyle(.secondary).lineLimit(1)
+                }
+                Spacer(minLength: 4)
+                Button { DropActions.uploadClipboard(); MenuBarController.shared.close(animated: true) } label: { Image(systemName: "doc.on.clipboard") }
+                    .buttonStyle(PanelIconButtonStyle(size: 24)).help("Envoyer le contenu du presse-papiers")
+                Button { AppDelegate.showDrop() } label: { Image(systemName: "list.bullet") }
+                    .buttonStyle(PanelIconButtonStyle(size: 24)).help("Afficher tous les envois")
+            }
+            .padding(.horizontal, 10).padding(.vertical, 8)
+            .background {
+                shape.fill(targeted ? AnyShapeStyle(tint.opacity(0.16)) : AnyShapeStyle(Color.primary.opacity(hovering ? 0.08 : 0.045)))
+            }
+            .overlay {
+                if targeted { shape.strokeBorder(tint, lineWidth: 1.5) }
+                else if state.fileDragActive { shape.strokeBorder(Color.secondary.opacity(0.45), style: StrokeStyle(lineWidth: 1.2, dash: [5, 4])) }
+            }
+            .contentShape(shape)
+            .animation(.easeOut(duration: 0.12), value: hovering)
+            .animation(.spring(response: 0.28, dampingFraction: 0.75), value: targeted)
+            .onHover { hovering = $0 }
+            .onTapGesture {
+                MenuBarController.shared.close(animated: true)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { DropActions.pickAndUpload() }
+            }
+            .dropDestination(for: URL.self) { urls, _ in
+                MenuBarController.shared.acceptDrop(urls)
+            } isTargeted: { targeted = $0 }
+            .help("Déposez des fichiers ou des dossiers (envoyés en .zip) — ou cliquez pour choisir")
+            .accessibilityElement(children: .contain)
+        }
+    }
+}
+
 // MARK: - Activity
 
 private struct ActivityCard: View {
@@ -433,7 +512,7 @@ private struct BackgroundJobsCard: View {
         if let job {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
-                    Image(systemName: job.isDone ? (job.failures.isEmpty ? "checkmark.circle.fill" : "exclamationmark.triangle.fill") : job.mode.tileSymbol)
+                    Image(systemName: job.isDone ? (job.failures.isEmpty ? "checkmark.circle.fill" : "exclamationmark.triangle.fill") : job.isUploadOnly || job.isSending ? "arrow.up.circle.fill" : job.mode.tileSymbol)
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(job.isDone ? (job.failures.isEmpty ? Color.green : Color.orange) : job.mode.tint)
                         .symbolEffect(.pulse, isActive: job.isActive)
@@ -458,8 +537,20 @@ private struct BackgroundJobsCard: View {
                     if center.queued.count > 0 {
                         Text("+ \(center.queued.count) en attente").font(.system(size: 10.5)).foregroundStyle(.secondary)
                     }
+                } else if !job.uploads.isEmpty, job.isUploadOnly {
+                    HStack(spacing: 6) {
+                        Button { DropUploader.copy(job.links) } label: { Label(job.uploads.count > 1 ? "Copier les liens" : "Copier le lien", systemImage: "link") }
+                        if job.uploads.count == 1, let u = URL(string: job.uploads[0].url) {
+                            Button { NSWorkspace.shared.open(u) } label: { Label("Ouvrir", systemImage: "arrow.up.right.square") }
+                        }
+                        Button { center.undo(job) } label: { Label("Supprimer", systemImage: "trash") }
+                    }
+                    .buttonStyle(PanelCapsuleButtonStyle())
                 } else if !job.outputs.isEmpty {
                     HStack(spacing: 6) {
+                        if !job.uploads.isEmpty {
+                            Button { DropUploader.copy(job.links) } label: { Label("Lien Drop", systemImage: "link") }
+                        }
                         Button { NSWorkspace.shared.activateFileViewerSelecting(job.outputs) } label: { Label("Afficher", systemImage: "magnifyingglass") }
                         if !job.historyIDs.isEmpty {
                             Button { center.undo(job) } label: { Label("Annuler", systemImage: "arrow.uturn.backward") }
@@ -716,18 +807,18 @@ private struct MenuBarFooter: View {
         let watched = store.prefs.watchedFolders.filter(\.enabled).count
         let scheduled = store.prefs.scheduledJobs.count
         HStack(spacing: 4) {
-            Button { AppDelegate.showSettings() } label: {
+            Button { SettingsNavigation.shared.tab = .automation; AppDelegate.showSettings() } label: {
                 Label(watched == 0 ? "Aucun dossier surveillé" : "\(watched) dossier\(watched > 1 ? "s" : "") surveillé\(watched > 1 ? "s" : "")",
                       systemImage: watched == 0 ? "folder" : "folder.badge.gearshape")
             }
             .help("Configurer les dossiers surveillés")
             if scheduled > 0 {
-                Button { AppDelegate.showSettings() } label: {
+                Button { SettingsNavigation.shared.tab = .automation; AppDelegate.showSettings() } label: {
                     Label("\(scheduled) planifié\(scheduled > 1 ? "s" : "")", systemImage: "clock")
                 }
             }
             Spacer(minLength: 4)
-            Button { AppDelegate.showSettings() } label: {
+            Button { SettingsNavigation.shared.tab = .general; AppDelegate.showSettings() } label: {
                 Label("Réglages", systemImage: "gearshape")
             }
         }

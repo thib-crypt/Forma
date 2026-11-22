@@ -69,6 +69,17 @@ final class HistoryModel {
             }
         }
         HistoryStore.shared.markUndone(done)
+        // A result that was sent to Drop goes away with its conversion.
+        let remote = DropUploader.records(forEntries: done).filter { !$0.isDeleted }
+        if !remote.isEmpty {
+            let prefs = PreferencesStore.shared.prefs.drop
+            Task {
+                let failed = await DropUploader.delete(remote, prefs: prefs)
+                Toast.show(failed.isEmpty ? "\(remote.count) lien\(remote.count > 1 ? "s" : "") Drop supprimé\(remote.count > 1 ? "s" : "")"
+                                          : "\(failed.count) fichier\(failed.count > 1 ? "s" : "") non supprimé\(failed.count > 1 ? "s" : "") de Drop",
+                           symbol: failed.isEmpty ? "trash" : "exclamationmark.triangle")
+            }
+        }
         AppModel.shared.didUndo(Set(done))
         reload()
         if reveal, !restored.isEmpty { NSWorkspace.shared.activateFileViewerSelecting(restored) }
@@ -76,6 +87,7 @@ final class HistoryModel {
         var msg = done.isEmpty ? "Rien n'a été annulé" : "\(done.count) traitement\(done.count > 1 ? "s" : "") annulé\(done.count > 1 ? "s" : "")"
         if !restored.isEmpty { msg += " · \(restored.count) original\(restored.count > 1 ? "aux" : "") restauré\(restored.count > 1 ? "s" : "")" }
         if kept > 0 { msg += " · \(kept) fichier\(kept > 1 ? "s" : "") modifié\(kept > 1 ? "s" : "") conservé\(kept > 1 ? "s" : "")" }
+        if !remote.isEmpty { msg += " · \(remote.count) lien\(remote.count > 1 ? "s" : "") Drop retiré\(remote.count > 1 ? "s" : "")" }
         if let p = problems.first {
             let alert = NSAlert()
             alert.messageText = done.isEmpty ? "Annulation impossible" : "Annulation partielle"

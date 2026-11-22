@@ -2,31 +2,32 @@ import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
 
-struct SettingsView: View {
-    @State private var nav = SettingsNavigation.shared
+/// The settings pages, in toolbar order (shown by `SettingsWindowController`).
+struct SettingsPage {
+    let tab: SettingsNavigation.Tab
+    let label: String
+    let symbol: String
+    let content: AnyView
 
-    var body: some View {
-        TabView(selection: $nav.tab) {
-            Tab("Général", systemImage: "gearshape", value: .general) { GeneralSettings() }
-            Tab("Images", systemImage: "photo", value: .images) { ImageSettingsView() }
-            Tab("Vidéo", systemImage: "film", value: .video) { VideoSettingsView() }
-            Tab("Audio", systemImage: "waveform", value: .audio) { AudioSettingsView() }
-            Tab("Sortie", systemImage: "folder", value: .output) { OutputSettingsView() }
-            Tab("Automatisation", systemImage: "bolt.horizontal", value: .automation) { AutomationSettings() }
-            Tab("Presse-papiers", systemImage: "doc.on.clipboard", value: .clipboard) { ClipboardSettingsView() }
-            Tab("Finder", systemImage: "contextualmenu.and.cursorarrow", value: SettingsNavigation.Tab.finder) { FinderSettingsView() }
-            Tab("Préréglages", systemImage: "square.stack", value: .presets) { PresetsSettings() }
-            Tab("Moteurs", systemImage: "cpu", value: .engines) { EnginesSettings() }
-        }
-        .frame(width: 700, height: 620)
-    }
+    @MainActor static let all: [SettingsPage] = [
+        .init(tab: .general, label: "Général", symbol: "gearshape", content: AnyView(GeneralSettings())),
+        .init(tab: .images, label: "Images", symbol: "photo", content: AnyView(ImageSettingsView())),
+        .init(tab: .video, label: "Vidéo", symbol: "film", content: AnyView(VideoSettingsView())),
+        .init(tab: .audio, label: "Audio", symbol: "waveform", content: AnyView(AudioSettingsView())),
+        .init(tab: .output, label: "Sortie", symbol: "folder", content: AnyView(OutputSettingsView())),
+        .init(tab: .automation, label: "Automatisation", symbol: "bolt.horizontal", content: AnyView(AutomationSettings())),
+        .init(tab: .clipboard, label: "Presse-papiers", symbol: "doc.on.clipboard", content: AnyView(ClipboardSettingsView())),
+        .init(tab: .finder, label: "Finder", symbol: "contextualmenu.and.cursorarrow", content: AnyView(FinderSettingsView())),
+        .init(tab: .drop, label: "Drop", symbol: "arrow.up.circle", content: AnyView(DropSettingsView())),
+        .init(tab: .presets, label: "Préréglages", symbol: "square.stack", content: AnyView(PresetsSettings())),
+        .init(tab: .engines, label: "Moteurs", symbol: "cpu", content: AnyView(EnginesSettings())),
+    ]
 }
 
 // MARK: - Général
 
 struct GeneralSettings: View {
     @Environment(PreferencesStore.self) private var store
-    @State private var loginEnabled = LoginItem.isEnabled
 
     var body: some View {
         @Bindable var store = store
@@ -37,16 +38,7 @@ struct GeneralSettings: View {
                 Toggle("Afficher le résultat dans le Finder", isOn: $store.prefs.processing.output.revealWhenDone)
                 Toggle("Notification à la fin du traitement", isOn: $store.prefs.notifyWhenDone)
             }
-            Section("Démarrage & barre des menus") {
-                Toggle("Ouvrir Forma à l'ouverture de session", isOn: $loginEnabled)
-                    .onChange(of: loginEnabled) { LoginItem.set(loginEnabled) }
-                Toggle("Afficher dans la barre des menus", isOn: $store.prefs.showInMenuBar)
-                Text("Garde Forma actif pour les dossiers surveillés, le presse-papiers et les dépôts rapides.")
-                    .font(.caption).foregroundStyle(.secondary)
-                Picker("Apparence", selection: $store.prefs.appearance) {
-                    ForEach(AppearanceMode.allCases) { Text($0.label).tag($0) }
-                }
-            }
+            PresenceSection()
             Section {
                 Toggle("Garder l'historique des traitements", isOn: $store.prefs.historyEnabled)
                 Picker("Conserver", selection: $store.prefs.historyRetentionDays) {
@@ -74,6 +66,184 @@ struct GeneralSettings: View {
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+// MARK: - Présence (Dock / barre des menus)
+
+enum Presence: CaseIterable, Identifiable {
+    case both, menuBar, dock
+    var id: Self { self }
+    var label: String {
+        switch self {
+        case .both: "Dock et barre des menus"
+        case .menuBar: "Barre des menus"
+        case .dock: "Dock"
+        }
+    }
+}
+
+struct PresenceSection: View {
+    @Environment(PreferencesStore.self) private var store
+    @State private var loginEnabled = LoginItem.isEnabled
+    @State private var hotKeys = GlobalHotKeyCenter.shared
+
+    private var presence: Presence {
+        !store.prefs.showInMenuBar ? .dock : store.prefs.dockIcon == .always ? .both : .menuBar
+    }
+
+    private func set(_ p: Presence) {
+        var prefs = store.prefs
+        switch p {
+        case .both: prefs.showInMenuBar = true; prefs.dockIcon = .always
+        case .menuBar: prefs.showInMenuBar = true; prefs.dockIcon = prefs.dockIcon == .withWindows ? .withWindows : .never
+        case .dock: prefs.showInMenuBar = false; prefs.dockIcon = .always
+        }
+        withAnimation(.smooth(duration: 0.25)) { store.prefs = prefs }
+    }
+
+    var body: some View {
+        @Bindable var store = store
+        Section {
+            HStack(spacing: 12) {
+                ForEach(Presence.allCases) { p in
+                    PresenceCard(presence: p, selected: presence == p) { set(p) }
+                }
+            }
+            .padding(.vertical, 4)
+            if presence == .menuBar {
+                Toggle("Afficher l'icône du Dock tant qu'une fenêtre est ouverte", isOn: Binding(
+                    get: { store.prefs.dockIcon == .withWindows },
+                    set: { store.prefs.dockIcon = $0 ? .withWindows : .never }))
+            }
+        } header: {
+            Text("Présence")
+        } footer: {
+            Text(presenceFooter)
+        }
+
+        Section {
+            Toggle("Ouvrir Forma à l'ouverture de session", isOn: $loginEnabled)
+                .onChange(of: loginEnabled) { LoginItem.set(loginEnabled) }
+            if store.prefs.showInMenuBar {
+                Toggle("Ouvrir la fenêtre principale au lancement", isOn: $store.prefs.showWindowAtLaunch)
+            }
+            LabeledContent("Raccourci global") {
+                HotKeyRecorder(hotKey: $store.prefs.globalHotKey)
+            }
+            if store.prefs.globalHotKey != nil && store.prefs.showInMenuBar {
+                Picker("Le raccourci ouvre", selection: $store.prefs.hotKeyAction) {
+                    ForEach(HotKeyAction.allCases) { Text($0.label).tag($0) }
+                }
+            }
+            if hotKeys.registrationFailed {
+                Label("Ce raccourci est déjà utilisé par le système ou une autre app.", systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption).foregroundStyle(.orange)
+            }
+            Picker("Apparence", selection: $store.prefs.appearance) {
+                ForEach(AppearanceMode.allCases) { Text($0.label).tag($0) }
+            }
+        } header: {
+            Text("Lancement & accès rapide")
+        } footer: {
+            Text(store.prefs.showInMenuBar
+                 ? "À l'ouverture de session, Forma démarre toujours discrètement dans la barre des menus. Le raccourci global fonctionne depuis n'importe quelle app : appuyez une seconde fois pour refermer."
+                 : "Le raccourci global affiche la fenêtre de Forma depuis n'importe quelle app ; appuyez une seconde fois pour la masquer.")
+        }
+    }
+
+    private var presenceFooter: String {
+        switch presence {
+        case .both:
+            "Forma reste actif pour les dossiers surveillés, le presse-papiers et les dépôts rapides sur l'icône de la barre des menus."
+        case .menuBar:
+            store.prefs.dockIcon == .never
+                ? "Forma n'apparaît ni dans le Dock ni dans ⌘⇥. Ses fenêtres s'ouvrent depuis l'icône de la barre des menus (⌥-clic pour la fenêtre principale) ; sans icône dans le Dock, la barre de menus de l'app n'est pas affichée mais ses raccourcis clavier restent actifs."
+                : "L'icône du Dock apparaît le temps qu'une fenêtre de Forma est ouverte, puis disparaît."
+        case .dock:
+            "Forma se comporte comme une app classique et quitte quand vous fermez sa dernière fenêtre (sauf traitement en cours)."
+        }
+    }
+}
+
+private struct PresenceCard: View {
+    let presence: Presence
+    let selected: Bool
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 8) {
+                PresenceIllustration(menuBar: presence != .dock, dock: presence != .menuBar)
+                    .frame(height: 74)
+                HStack(spacing: 5) {
+                    Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                        .foregroundStyle(selected ? AnyShapeStyle(.tint) : AnyShapeStyle(.tertiary))
+                        .contentTransition(.symbolEffect(.replace))
+                    Text(presence.label).font(.callout.weight(selected ? .semibold : .regular))
+                }
+            }
+            .padding(8)
+            .frame(maxWidth: .infinity)
+            .background {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(selected ? AnyShapeStyle(.tint.opacity(0.10)) : AnyShapeStyle(.quaternary.opacity(hovering ? 0.6 : 0.3)))
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(selected ? AnyShapeStyle(.tint) : AnyShapeStyle(.separator), lineWidth: selected ? 2 : 1)
+            }
+            .contentShape(.rect(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .animation(.smooth(duration: 0.18), value: hovering)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+}
+
+/// A tiny screen: menu bar on top, Dock at the bottom; Forma's icons in the accent color where it appears.
+private struct PresenceIllustration: View {
+    let menuBar: Bool
+    let dock: Bool
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(LinearGradient(colors: [Color.blue.opacity(0.35), Color.purple.opacity(0.3)],
+                                     startPoint: .topLeading, endPoint: .bottomTrailing))
+            VStack(spacing: 0) {
+                HStack(spacing: 3) {
+                    Circle().fill(.primary.opacity(0.5)).frame(width: 4, height: 4)
+                    Capsule().fill(.primary.opacity(0.3)).frame(width: 14, height: 3)
+                    Spacer()
+                    Capsule().fill(.primary.opacity(0.3)).frame(width: 8, height: 3)
+                    RoundedRectangle(cornerRadius: 1.5)
+                        .fill(menuBar ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary.opacity(0.3)))
+                        .frame(width: menuBar ? 7 : 5, height: menuBar ? 7 : 4)
+                        .shadow(color: menuBar ? .accentColor.opacity(0.6) : .clear, radius: 3)
+                    Capsule().fill(.primary.opacity(0.3)).frame(width: 10, height: 3)
+                }
+                .padding(.horizontal, 6)
+                .frame(height: 11)
+                .background(.ultraThinMaterial)
+                Spacer()
+                HStack(spacing: 3) {
+                    ForEach(0..<4) { i in
+                        RoundedRectangle(cornerRadius: 2.5)
+                            .fill(i == 2 && dock ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary.opacity(0.28)))
+                            .frame(width: 10, height: 10)
+                            .shadow(color: i == 2 && dock ? .accentColor.opacity(0.6) : .clear, radius: 3)
+                    }
+                }
+                .padding(.horizontal, 5).padding(.vertical, 3)
+                .background(.ultraThinMaterial, in: .rect(cornerRadius: 5))
+                .padding(.bottom, 5)
+            }
+            .clipShape(.rect(cornerRadius: 8))
+        }
+        .frame(maxWidth: 120)
     }
 }
 

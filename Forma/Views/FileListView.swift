@@ -38,7 +38,6 @@ struct FileRow: View {
     @Environment(AppModel.self) private var model
     @Environment(PreferencesStore.self) private var store
     let item: FileItem
-    @State private var showInfo = false
     @State private var hovering = false
 
     private var target: FormatDescriptor? {
@@ -93,11 +92,8 @@ struct FileRow: View {
         .padding(.vertical, 5)
         .padding(.horizontal, 6)
         .contentShape(Rectangle())
-        .popover(isPresented: $showInfo) { MetadataView(url: item.url) }
         .onHover { h in withAnimation(.easeOut(duration: 0.12)) { hovering = h } }
-        .onTapGesture(count: 2) {
-            if let out = item.outputs.first { NSWorkspace.shared.activateFileViewerSelecting([out]) }
-        }
+        // Double-click is the List's primaryAction (opens the result): a tap gesture here delayed every selection click.
     }
 }
 
@@ -146,6 +142,12 @@ struct StatusView: View {
                         .background((s > 0 ? Color.green : Color.orange).opacity(0.16), in: .capsule)
                         .foregroundStyle(s > 0 ? .green : .orange)
                 }
+                if item.isSendingToDrop {
+                    ProgressView().controlSize(.small).help("Envoi sur Drop…")
+                } else if let link = item.dropLinks.first {
+                    Button { DropUploader.copy(item.dropLinks) } label: { Image(systemName: "link.circle.fill").foregroundStyle(.tint) }
+                        .buttonStyle(.plain).help("Lien Drop : \(link)\nClic pour copier")
+                }
                 Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
             }
             .transition(.scale.combined(with: .opacity))
@@ -189,6 +191,19 @@ struct FormatOverrideMenu: View {
 struct FileContextMenu: View {
     @Environment(AppModel.self) private var model
     let item: FileItem
+
+    @ViewBuilder
+    private func dropButtons(for urls: [URL]) -> some View {
+        if DropServer.isConfigured(PreferencesStore.shared.prefs.drop), !item.isSendingToDrop {
+            if let link = item.dropLinks.first {
+                Button("Copier le lien Drop") { DropUploader.copy(item.dropLinks); Toast.show("Lien Drop copié", symbol: "link") }
+                Button("Ouvrir le lien Drop") { if let u = URL(string: link) { NSWorkspace.shared.open(u) } }
+            } else {
+                Button("Envoyer sur Drop") { Task { await model.sendToDrop(item, urls: urls, copyWhenDone: true) } }
+            }
+        }
+    }
+
     var body: some View {
         if let out = item.outputs.first {
             Button("Afficher le résultat dans le Finder") { NSWorkspace.shared.activateFileViewerSelecting(item.outputs) }
@@ -204,12 +219,14 @@ struct FileContextMenu: View {
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.writeObjects(item.outputs as [NSURL])
             }
+            dropButtons(for: item.outputs)
             Divider()
         }
         if item.outputs.isEmpty, PreviewRenderer.canPreview(item.kind), !item.status.isProcessing {
             Button("Aperçu avec les réglages actuels") { PreviewWindow.open(item, mode: model.mode) }
             Divider()
         }
+        if item.outputs.isEmpty { dropButtons(for: [item.url]) }
         Button("Afficher l'original dans le Finder") { NSWorkspace.shared.activateFileViewerSelecting([item.url]) }
         Button("Infos & métadonnées") { MetadataWindow.show(item.url) }
         Divider()

@@ -10,6 +10,8 @@ struct MenuEntry: Hashable, Sendable {
     var preset: CompressionPreset?
     var batch: UUID?
     var recursive: Bool?
+    /// Send to Drop (after processing for `.process`, as is for `.upload`).
+    var drop: DropOptions?
     /// Acts on the folder the menu was opened in (window background), not on the selection.
     var usesContainer = false
 }
@@ -120,7 +122,7 @@ enum MenuBuilder {
     private static func body(_ sel: SelectionSummary, config: MenuConfig, container: Bool) -> [MenuNode] {
         if sel.folders > 0 || container { return folderMenu(sel, config: config, container: container) }
         let kinds = sel.kinds
-        guard !kinds.isEmpty else { return [] }
+        guard !kinds.isEmpty else { return sel.unsupported > 0 ? dropNodes(sel, config: config) : [] }
         return kinds.count == 1 ? singleKindMenu(kinds[0], sel, config: config) : mixedMenu(kinds, sel, config: config)
     }
 
@@ -152,6 +154,7 @@ enum MenuBuilder {
             process.append(.item(title: "Agrandir ×2 (IA)", symbol: ProcessMode.upscale.symbol, entry: MenuEntry(action: .process, mode: .upscale)))
         }
         sections.append(process)
+        sections.append(dropNodes(sel, config: config, compress: canCompress(kind, sel) ? "Compresser" : nil))
         sections.append(recipeNodes(config, accepting: [kind]))
         sections.append(tail(config))
         return join(sections)
@@ -185,6 +188,7 @@ enum MenuBuilder {
                                  entry: MenuEntry(action: .process, mode: .upscale, kinds: [.image])))
         }
         sections.append(process)
+        sections.append(dropNodes(sel, config: config, compress: "Compresser"))
         sections.append(recipeNodes(config, accepting: kinds))
         sections.append(tail(config))
         return join(sections)
@@ -217,6 +221,8 @@ enum MenuBuilder {
             process.append(.item(title: "Agrandir les images \(scope) ×2 (IA)", symbol: ProcessMode.upscale.symbol,
                                  entry: MenuEntry(action: .process, mode: .upscale, kinds: [.image], recursive: recursive, usesContainer: container)))
         }
+        var drop = dropNodes(sel, config: config, container: container)
+        if container { drop = drop.map { $0.retargeted(container: true, recursive: false) } }
         var recipes = recipeNodes(config, accepting: MediaKind.allCases)
         if container { recipes = recipes.map { $0.retargeted(container: true, recursive: false) } }
         var extra: [MenuNode] = []
@@ -226,7 +232,7 @@ enum MenuBuilder {
         }
         var t = tail(config)
         if container { t.removeAll { if case .item(_, _, let e) = $0 { e.action == .open } else { false } } }
-        return join([convert, process, recipes, extra, t])
+        return join([convert, process, drop, recipes, extra, t])
     }
 
     // MARK: Pieces
@@ -287,6 +293,26 @@ enum MenuBuilder {
         }
     }
 
+    /// "Envoyer sur Drop", with an expiry submenu, and "Compresser et envoyer" when the selection can be compressed.
+    /// Works on any file and on folders (zipped): no media type is required.
+    private static func dropNodes(_ sel: SelectionSummary, config: MenuConfig, compress: String? = nil, container: Bool = false) -> [MenuNode] {
+        guard let d = config.drop, d.finder else { return [] }
+        let many = sel.fileCount + sel.folders + sel.unsupported > 1
+        let title = container ? "Envoyer ce dossier sur Drop" : many ? "Envoyer la sélection sur Drop" : sel.folders == 1 ? "Envoyer le dossier sur Drop" : "Envoyer sur Drop"
+        var nodes: [MenuNode] = [
+            .item(title: title, symbol: "arrow.up.circle", entry: MenuEntry(action: .upload, drop: DropOptions(), usesContainer: container)),
+        ]
+        if compress != nil, !container, sel.folders == 0 {
+            nodes.append(.item(title: "Compresser et envoyer sur Drop", symbol: "arrow.up.circle.badge.clock",
+                               entry: MenuEntry(action: .process, mode: .compress, drop: DropOptions())))
+        }
+        let expiries: [DropExpiry] = [.hour, .day, .week, .month]
+        nodes.append(.submenu(title: "Envoyer sur Drop, expire dans…", symbol: "timer", children: expiries.map { e in
+            .item(title: e.label, symbol: nil, entry: MenuEntry(action: .upload, drop: DropOptions(expiry: e), usesContainer: container))
+        }))
+        return nodes
+    }
+
     private static func recipeNodes(_ config: MenuConfig, accepting kinds: [MediaKind]) -> [MenuNode] {
         guard config.showRecipes else { return [] }
         let list = config.recipes.filter { r in r.showInFinder && kinds.contains { r.accepts($0) } }
@@ -342,6 +368,7 @@ enum MenuBuilder {
         r.recipe = entry.recipe
         r.batch = entry.batch
         r.recursive = entry.recursive
+        r.drop = entry.drop
         if let p = entry.preset { r.overrides = RequestOverrides(preset: p) }
         return r
     }

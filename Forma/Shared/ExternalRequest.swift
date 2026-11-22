@@ -16,6 +16,8 @@ enum RequestAction: String, Codable, Sendable {
     case clipboard      // run the clipboard optimizer now
     case showApp        // bring Forma to the front
     case settings       // open the Finder settings tab
+    case upload         // send the files as they are to Drop (any type, folders are zipped)
+    case refresh        // re-publish the menu configuration (after `forma drop login`)
 }
 
 enum RequestDestination: Codable, Hashable, Sendable {
@@ -69,6 +71,8 @@ struct ExternalRequest: Codable, Identifiable, Sendable {
     var destination: RequestDestination?
     /// Select the results in the Finder when done. `nil` = Finder settings.
     var reveal: Bool?
+    /// Send the results (or, for `.upload`, the files themselves) to Drop. `nil` = don't.
+    var drop: DropOptions?
 
     init(source: RequestSource, action: RequestAction = .process, mode: ProcessMode = .convert, target: String? = nil,
          paths: [String] = []) {

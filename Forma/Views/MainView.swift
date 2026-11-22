@@ -1,11 +1,11 @@
 import SwiftUI
+import AppKit
 import UniformTypeIdentifiers
 
 struct MainView: View {
     @Environment(AppModel.self) private var model
     @Environment(PreferencesStore.self) private var store
     @State private var dropTargeted = false
-    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         @Bindable var model = model
@@ -26,6 +26,7 @@ struct MainView: View {
         }
         .dropDestination(for: URL.self) { urls, _ in
             model.add(urls)
+            NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
             return true
         } isTargeted: { dropTargeted = $0 }
         .toolbar {
@@ -43,9 +44,10 @@ struct MainView: View {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button { AddPanel.present() } label: { Label("Ajouter", systemImage: "plus") }
                     .help("Ajouter des fichiers ou dossiers (⌘O)")
-                Button { openWindow(id: "history") } label: { Label("Historique", systemImage: "clock.arrow.circlepath") }
+                Button { AppDelegate.showHistory() } label: { Label("Historique", systemImage: "clock.arrow.circlepath") }
                     .help("Historique des traitements, avec annulation (⌘Y)")
-                SettingsLink { Label("Réglages", systemImage: "gearshape") }
+                Button { AppDelegate.showSettings() } label: { Label("Réglages", systemImage: "gearshape") }
+                    .help("Réglages (⌘,)")
             }
         }
         .navigationTitle("")
@@ -60,7 +62,7 @@ struct DropZoneView: View {
 
     private var subtitle: String {
         switch model.mode {
-        case .convert: "Images, vidéos, audio, PDF et RAW — plus de 130 formats, 100 % en local."
+        case .convert: "Images, vidéos, audio, documents, PDF et RAW — plus de 130 formats, 100 % en local."
         case .compress: "Réduisez le poids sans perte visible. Les originaux ne sont jamais modifiés par défaut."
         case .upscale: "Doublez la définition de vos images grâce à la super-résolution IA d'Apple,\nexécutée sur le Neural Engine — détails nets, sans halo, 100 % en local."
         }

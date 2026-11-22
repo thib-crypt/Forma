@@ -3,7 +3,7 @@ import AppKit
 
 /// `forma` command-line interface (the app binary itself, symlinked into /usr/local/bin).
 enum CLI {
-    static let commands: Set<String> = ["convert", "compress", "upscale", "formats", "tools", "help", "--help", "-h", "--version", "version", "info", "history", "undo", "optimize", "request", "run", "finder"]
+    static let commands: Set<String> = ["convert", "compress", "upscale", "formats", "tools", "help", "--help", "-h", "--version", "version", "info", "history", "undo", "optimize", "request", "run", "finder", "drop"]
 
     static func shouldHandle(_ args: [String]) -> Bool {
         guard args.count > 1 else { return false }
@@ -33,6 +33,7 @@ enum CLI {
         case "request": return request(rest)
         case "run": return runRecipe(rest)
         case "finder": return finder(rest)
+        case "drop": return drop(rest)
         case "info":
             for p in rest {
                 let u = URL(fileURLWithPath: p)
@@ -50,6 +51,8 @@ enum CLI {
         var quiet = false
         var json = false
         var origin: HistoryOrigin = .cli
+        var dropOptions: DropOptions?
+        var dropPrefs = PreferencesStore.loadSnapshot().drop
         func value() -> String? { rest.isEmpty ? nil : rest.removeFirst() }
         while !rest.isEmpty {
             let a = rest.removeFirst()
@@ -94,6 +97,12 @@ enum CLI {
                 outDir = URL(fileURLWithPath: (v as NSString).expandingTildeInPath)
             case "--quiet": quiet = true
             case "--json": json = true; quiet = true
+            case "--drop": dropOptions = dropOptions ?? DropOptions()
+            case "--expiry":
+                guard let v = value(), let e = DropExpiry.parse(v) else { fputs("Durée inconnue : 1h, 1d, 7d, 30d, never.\n", stderr); return 2 }
+                dropOptions = dropOptions ?? DropOptions()
+                dropOptions?.expiry = e
+            case "--direct": dropPrefs.linkStyle = .direct
             case "--origin":
                 guard let v = value(), let o = HistoryOrigin(rawValue: v) else { return 2 }
                 origin = o
@@ -103,6 +112,7 @@ enum CLI {
             }
         }
         if mode == .convert && target == nil { fputs("Précisez --to <format>.\n", stderr); return 2 }
+        if dropOptions != nil, !DropServer.isConfigured(dropPrefs) { fputs("✗ \(DropError.notConfigured.localizedDescription)\n", stderr); return 1 }
         var inputs = Pipeline.expand(files)
         if mode == .upscale {
             inputs = inputs.filter { FileDetection.classify($0).mediaKind == .image }
@@ -117,22 +127,41 @@ enum CLI {
         let sem = DispatchSemaphore(value: 0)
         nonisolated(unsafe) var failures: Int32 = 0
         let snapshot = snap, tgt = target, out = outDir, batch = UUID(), org = origin, asJSON = json
+        let dropOpts = dropOptions, dropSettings = dropPrefs
         nonisolated(unsafe) var report: [[String: Any]] = []
+        nonisolated(unsafe) var links: [String] = []
         Task.detached {
             let width = mode == .upscale ? 2 : SystemInfo.imageParallelism(requested: 0)
-            await withTaskGroup(of: (URL, Result<PipelineResult, Error>, TimeInterval).self) { group in
+            await withTaskGroup(of: (URL, Result<PipelineResult, Error>, TimeInterval, [DropUpload], Int).self) { group in
                 var iterator = inputs.enumerated().makeIterator()
                 func add() {
                     guard let (i, u) = iterator.next() else { return }
                     group.addTask {
                         let t = Date()
-                        do { return (u, .success(try await Pipeline.run(input: u, mode: mode, snapshot: snapshot, index: i + 1, targetOverride: tgt, outputFolder: out, origin: org, batch: batch) { _ in }), Date().timeIntervalSince(t)) }
-                        catch { return (u, .failure(error), Date().timeIntervalSince(t)) }
+                        do {
+                            let res = try await Pipeline.run(input: u, mode: mode, snapshot: snapshot, index: i + 1, targetOverride: tgt, outputFolder: out, origin: org, batch: batch) { _ in }
+                            // Results go to Drop as soon as they are written; the next file converts meanwhile.
+                            var sent: [DropUpload] = []
+                            var failed = 0
+                            if let dropOpts {
+                                for o in res.outputs {
+                                    do { sent.append(try await DropUploader.upload(o, options: dropOpts, prefs: dropSettings, origin: org, batch: batch, entry: res.historyID)) }
+                                    catch { failed += 1; fputs("✗ \(o.lastPathComponent) : \(error.localizedDescription)\n", stderr) }
+                                }
+                            }
+                            return (u, .success(res), Date().timeIntervalSince(t), sent, failed)
+                        } catch { return (u, .failure(error), Date().timeIntervalSince(t), [], 0) }
                     }
                 }
                 for _ in 0..<width { add() }
-                while let (u, r, t) = await group.next() {
-                    if asJSON { report.append(resultJSON(u, r, t, mode: mode)) }
+                while let (u, r, t, sent, uploadFailures) = await group.next() {
+                    links += sent.map(\.url)
+                    failures += Int32(uploadFailures)
+                    if asJSON {
+                        var item = resultJSON(u, r, t, mode: mode)
+                        if !sent.isEmpty { item["drop"] = sent.map { ["url": $0.url, "key": $0.key] } }
+                        report.append(item)
+                    }
                     switch r {
                     case .success(let res):
                         if !quiet {
@@ -141,8 +170,9 @@ enum CLI {
                             else {
                                 let pct = before > 0 && res.outputSize > 0 && mode != .upscale ? Int((1 - Double(res.outputSize) / Double(max(1, before))) * 100) : 0
                                 print("✓ \(u.lastPathComponent) → \(res.outputs.map(\.lastPathComponent).joined(separator: ", ")) · \(res.outputSize.formattedBytes)\(pct > 0 ? " (−\(pct) %)" : "") · \(String(format: "%.2f s", t))")
+                                for s in sent { print("  ↑ \(s.url)") }
                             }
-                        }
+                        } else if !asJSON { sent.forEach { print($0.url) } }
                     case .failure(let e):
                         failures += 1
                         if !asJSON { fputs("✗ \(u.lastPathComponent): \(e.localizedDescription)\n", stderr) }
@@ -154,6 +184,10 @@ enum CLI {
         }
         sem.wait()
         if json { printJSON(report) }
+        if !links.isEmpty, dropOptions?.copyLink ?? dropPrefs.copyLink {
+            MainActor.assumeIsolated { DropUploader.copy(links) }
+            if !quiet { print(links.count == 1 ? "Lien Drop copié dans le presse-papiers." : "\(links.count) liens Drop copiés dans le presse-papiers.") }
+        }
         return failures == 0 ? 0 : 1
     }
 
@@ -306,6 +340,14 @@ enum CLI {
             }
         }
         HistoryStore.shared.markUndone(done)
+        // Results that were sent to Drop go away with their conversion.
+        let remote = DropUploader.records(forEntries: done).filter { !$0.isDeleted }
+        if !remote.isEmpty {
+            let prefs = PreferencesStore.loadSnapshot().drop
+            let failed = wait { await DropUploader.delete(remote, prefs: prefs) }
+            print("🗑  \(remote.count - failed.count) lien\(remote.count - failed.count > 1 ? "s" : "") Drop supprimé\(remote.count - failed.count > 1 ? "s" : "")")
+            for k in failed { fputs("✗ \(k) n'a pas pu être supprimé de Drop\n", stderr); failures += 1 }
+        }
         return failures == 0 ? 0 : 1
     }
 
@@ -326,6 +368,7 @@ enum CLI {
         case "undo": r.action = .undo
         case "clipboard": r.action = .clipboard
         case "watch": r.action = .watch
+        case "upload", "drop": r.action = .upload; r.drop = DropOptions()
         default: fputs(requestUsage, stderr); return 2
         }
         let prefs = PreferencesStore.loadSnapshot()
@@ -349,6 +392,10 @@ enum CLI {
                     : .folder((v as NSString).expandingTildeInPath)
             case "--only":
                 r.kinds = it.next()?.split(separator: ",").compactMap { MediaKind(rawValue: String($0)) }
+            case "--drop": r.drop = r.drop ?? DropOptions()
+            case "--expiry":
+                guard let v = it.next(), let e = DropExpiry.parse(v) else { fputs("Durée inconnue : 1h, 1d, 7d, 30d, never.\n", stderr); return 2 }
+                var d = r.drop ?? DropOptions(); d.expiry = e; r.drop = d
             case "--no-recursive": r.recursive = false
             case "--reveal": r.reveal = true
             case "--batch": r.batch = it.next().flatMap(UUID.init(uuidString:))
@@ -359,7 +406,7 @@ enum CLI {
         }
         if !o.isEmpty { r.overrides = o }
         if r.action == .recipe, r.recipe == nil { fputs("Précisez --recipe <nom>.\n", stderr); return 2 }
-        if [.process, .recipe, .open, .watch].contains(r.action), r.paths.isEmpty { fputs("Aucun fichier.\n", stderr); return 2 }
+        if [.process, .recipe, .open, .watch, .upload].contains(r.action), r.paths.isEmpty { fputs("Aucun fichier.\n", stderr); return 2 }
         do {
             guard let inbox = GroupContainer.inbox, let url = GroupContainer.requestURL(r.id) else { throw GroupContainer.GroupError.unavailable }
             try FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: true)
@@ -373,7 +420,7 @@ enum CLI {
         config.activates = false
         config.addsToRecentItems = false
         config.arguments = ["--headless"]
-        let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: GroupContainer.appBundleID) ?? URL(fileURLWithPath: "/Applications/Forma.app")
+        let app = GroupContainer.preferredAppURL() ?? GroupContainer.installedAppURL
         nonisolated(unsafe) var failure: Error?
         NSWorkspace.shared.open([GroupContainer.jobURL(r.id)], withApplicationAt: app, configuration: config) { _, e in failure = e; sem.signal() }
         _ = sem.wait(timeout: .now() + 15)
@@ -383,9 +430,10 @@ enum CLI {
     }
 
     static let requestUsage = """
-    forma request <convert|compress|upscale|recipe|open|undo|clipboard|watch> [options] <fichiers…>
+    forma request <convert|compress|upscale|recipe|open|undo|clipboard|watch|upload> [options] <fichiers…>
       --to <fmt>  --recipe <nom>  --preset <nom>  -q <1-100>  --max <px>
       --dest alongside|clipboard|default|<dossier>  --only image,video,…  --no-recursive  --reveal
+      --drop [--expiry 7d]     envoie les résultats sur Drop (avec « upload » : les fichiers tels quels)
 
     """
 
@@ -414,6 +462,8 @@ enum CLI {
         nonisolated(unsafe) var failures: Int32 = 0
         nonisolated(unsafe) var report: [[String: Any]] = []
         let batch = UUID()
+        let dropSettings = prefs.drop
+        nonisolated(unsafe) var links: [String] = []
         Task.detached {
             let width = plan.mode == .upscale ? 2 : SystemInfo.imageParallelism(requested: 0)
             await withTaskGroup(of: (URL, Result<PipelineResult, Error>, TimeInterval).self) { group in
@@ -425,6 +475,15 @@ enum CLI {
                         do {
                             let res = try await Pipeline.run(input: f.url, mode: plan.mode, snapshot: plan.snapshot, index: i + 1, targetOverride: f.target,
                                                              outputFolder: f.outputFolder, origin: .cli, batch: batch) { _ in }
+                            if let dropOptions = plan.drop {
+                                for o in res.outputs {
+                                    do {
+                                        let up = try await DropUploader.upload(o, options: dropOptions, prefs: dropSettings, origin: .cli, batch: batch, entry: res.historyID)
+                                        links.append(up.url)
+                                        if !json { print("  ↑ \(up.url)") }
+                                    } catch { fputs("✗ \(o.lastPathComponent) : \(error.localizedDescription)\n", stderr) }
+                                }
+                            }
                             return (f.url, .success(res), Date().timeIntervalSince(t))
                         } catch { return (f.url, .failure(error), Date().timeIntervalSince(t)) }
                     }
@@ -446,6 +505,10 @@ enum CLI {
         }
         sem.wait()
         if json { printJSON(report) }
+        if !links.isEmpty, plan.drop?.copyLink ?? dropSettings.copyLink {
+            MainActor.assumeIsolated { DropUploader.copy(links) }
+            if !json { print(links.count == 1 ? "Lien Drop copié dans le presse-papiers." : "\(links.count) liens Drop copiés dans le presse-papiers.") }
+        }
         return failures == 0 ? 0 : 1
     }
 
@@ -539,6 +602,7 @@ enum CLI {
           --overwrite          écraser les fichiers existants
           --quiet
           --json               résultat en JSON (pour les scripts et Copia)
+          --drop [--expiry 7d] [--direct]   envoie ensuite chaque résultat sur Drop et copie le lien
 
       forma optimize <images…> [--app <bundle id>] [--force] [-o <dossier>] [--json]
                                applique les règles de l'optimiseur de presse-papiers
@@ -547,6 +611,7 @@ enum CLI {
       forma run <recette> <fichiers…> [--json]   applique une recette (forma run --list)
       forma request <convert|compress|upscale|recipe|open|undo|clipboard> [options] <fichiers…>
                                confie le travail à Forma en arrière-plan, comme le menu du Finder
+      forma drop <fichiers…> [--expiry 7d] [--direct]   envoie sur Drop et copie le lien (forma drop --help)
       forma finder status|enable|disable|reset   état des extensions Finder et Partager
       forma finder menu [--container|--toolbar] <fichiers…>   affiche le menu Finder pour ces fichiers
     """

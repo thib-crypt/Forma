@@ -13,9 +13,9 @@ final class ShareViewController: NSViewController {
         model.context = extensionContext
         model.load(extensionContext?.inputItems as? [NSExtensionItem] ?? [])
         let host = NSHostingView(rootView: ShareView(model: model))
-        host.frame = NSRect(x: 0, y: 0, width: 400, height: 460)
+        host.frame = NSRect(x: 0, y: 0, width: 400, height: 520)
         view = host
-        preferredContentSize = NSSize(width: 400, height: 460)
+        preferredContentSize = NSSize(width: 400, height: 520)
     }
 }
 
@@ -40,6 +40,11 @@ final class ShareModel {
     var recipe: UUID?
     var destination: Int = 0     // 0 alongside, 1 shares folder, 2 clipboard
     var sending = false
+    /// "Envoyer": the files go to Drop as they are (any type).
+    var sendOnly = false
+    /// Convert / compress first, then send the results to Drop.
+    var alsoDrop = false
+    var dropExpiry: DropExpiry?
     var error: String?
     let config = MenuConfigStore.Reader().config
     weak var context: NSExtensionContext?
@@ -49,6 +54,8 @@ final class ShareModel {
         for k in items.compactMap(\.kind) where !seen.contains(k) { seen.append(k) }
         return seen
     }
+    var dropAvailable: Bool { config.drop?.share == true }
+    var hasProcessable: Bool { items.contains { $0.kind != nil } }
     var allFiles: Bool { !items.isEmpty && items.allSatisfy { $0.fileURL != nil } }
     var totalSize: Int64 { items.compactMap(\.size).reduce(0, +) }
     var recipes: [RecipeSummary] { config.recipes.filter { r in r.showInShare && kinds.contains { r.accepts($0) } } }
@@ -92,8 +99,9 @@ final class ShareModel {
         }
         group.notify(queue: .main) { [weak self] in
             guard let self else { return }
-            self.items = loaded.keys.sorted().compactMap { loaded[$0] }.filter { $0.kind != nil }
+            self.items = loaded.keys.sorted().compactMap { loaded[$0] }.filter { $0.kind != nil || self.dropAvailable }
             self.loading = false
+            self.sendOnly = !self.hasProcessable && !self.items.isEmpty
             self.destination = self.allFiles ? 0 : 1
             if self.kinds.count == 1, self.kinds[0] == .image || self.kinds[0] == .office || self.kinds[0] == .document {
                 self.target = self.formatChoices.first?.id
@@ -114,13 +122,17 @@ final class ShareModel {
         guard !sending, !items.isEmpty else { return }
         sending = true
         var r = ExternalRequest(source: .share, mode: mode)
-        if let recipe {
+        if sendOnly {
+            r.action = .upload
+            r.drop = DropOptions(expiry: dropExpiry)
+        } else if let recipe {
             r.action = .recipe
             r.recipe = recipe
         } else {
             r.target = mode == .convert ? target : nil
             if mode == .compress, let preset { r.overrides = RequestOverrides(preset: preset) }
         }
+        if alsoDrop, !sendOnly { r.drop = DropOptions(expiry: dropExpiry) }
         switch destination {
         case 0: r.destination = .alongside
         case 2: r.destination = .clipboard

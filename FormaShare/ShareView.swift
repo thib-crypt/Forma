@@ -14,16 +14,21 @@ struct ShareView: View {
                                        description: Text("Forma accepte les images, vidéos, fichiers audio, PDF et documents."))
             } else {
                 modePicker
-                if model.recipe == nil { options }
-                recipes
-                destination
+                if model.sendOnly {
+                    dropOptions
+                } else {
+                    if model.recipe == nil { options }
+                    recipes
+                    destination
+                    if model.dropAvailable { alsoDrop }
+                }
                 Spacer(minLength: 0)
                 if let e = model.error { Text(e).font(.caption).foregroundStyle(.red) }
                 footer
             }
         }
         .padding(18)
-        .frame(width: 400, height: 460)
+        .frame(width: 400, height: 520)
     }
 
     // MARK: Header
@@ -48,16 +53,52 @@ struct ShareView: View {
 
     // MARK: Options
 
+    /// 0 convertir · 1 compresser · 2 agrandir · 3 envoyer sur Drop
+    private var choice: Binding<Int> {
+        Binding(get: {
+            if model.sendOnly { return 3 }
+            return model.mode == .convert ? 0 : model.mode == .compress ? 1 : 2
+        }, set: { v in
+            model.sendOnly = v == 3
+            if v != 3 { model.mode = v == 0 ? .convert : v == 1 ? .compress : .upscale }
+            model.recipe = nil
+        })
+    }
+
     private var modePicker: some View {
-        Picker("", selection: $model.mode) {
-            Text("Convertir").tag(ProcessMode.convert)
-            Text("Compresser").tag(ProcessMode.compress)
-            if model.kinds == [.image] { Text("Agrandir ×2").tag(ProcessMode.upscale) }
+        Picker("", selection: choice) {
+            if model.hasProcessable {
+                Text("Convertir").tag(0)
+                Text("Compresser").tag(1)
+                if model.kinds == [.image] { Text("Agrandir ×2").tag(2) }
+            }
+            if model.dropAvailable { Text("Envoyer").tag(3) }
         }
         .pickerStyle(.segmented)
         .labelsHidden()
-        .disabled(model.recipe != nil)
-        .onChange(of: model.mode) { model.recipe = nil }
+        .disabled(model.recipe != nil && !model.sendOnly)
+    }
+
+    private var dropOptions: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Les fichiers sont envoyés tels quels sur Drop (\(model.config.drop?.host ?? "")). Le lien est copié dans le presse-papiers.",
+                  systemImage: "arrow.up.circle")
+                .font(.callout).foregroundStyle(.secondary)
+            expiryChips
+        }
+    }
+
+    private var expiryChips: some View {
+        Chips(title: "Expiration du lien", items: DropExpiry.allCases.map { ($0.rawValue, $0 == .never ? "Jamais" : $0.label) },
+              selection: Binding<String?>(get: { (model.dropExpiry ?? model.config.drop?.expiry ?? .never).rawValue },
+                                          set: { model.dropExpiry = $0.flatMap(DropExpiry.init(rawValue:)) }))
+    }
+
+    private var alsoDrop: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Toggle(isOn: $model.alsoDrop) { Label("Envoyer ensuite sur Drop", systemImage: "arrow.up.circle") }
+            if model.alsoDrop { expiryChips }
+        }
     }
 
     @ViewBuilder
@@ -123,11 +164,12 @@ struct ShareView: View {
             Button("Annuler") { model.cancel() }.keyboardShortcut(.cancelAction)
             Button(actionTitle) { model.send() }
                 .keyboardShortcut(.defaultAction)
-                .disabled(model.sending || (model.mode == .convert && model.recipe == nil && model.formatChoices.count > 0 && model.target == nil))
+                .disabled(model.sending || (!model.sendOnly && model.mode == .convert && model.recipe == nil && model.formatChoices.count > 0 && model.target == nil))
         }
     }
 
     private var actionTitle: String {
+        if model.sendOnly { return "Envoyer sur Drop" }
         if model.recipe != nil { return "Appliquer" }
         return model.mode == .convert ? "Convertir" : model.mode == .compress ? "Compresser" : "Agrandir"
     }

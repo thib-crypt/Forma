@@ -510,6 +510,41 @@ struct Preferences: Codable, Equatable, Sendable {
     // Forma 1.3: Finder & Share integration, recipes.
     var finder = FinderPreferences()
     var recipes: [Recipe] = Recipe.examples
+
+    // Forma 1.4: Drop (self-hosted S3 share service).
+    var drop = DropPreferences()
+
+    // Forma 1.5: where Forma lives (Dock / menu bar), what a launch shows, global shortcut.
+    var dockIcon: DockIconMode = .always
+    var showWindowAtLaunch = true
+    var globalHotKey: GlobalHotKey? = nil
+    var hotKeyAction: HotKeyAction = .menuBarPanel
+
+    /// The Dock rule actually applied: Forma must stay reachable, so without the menu bar item it can at most
+    /// hide its Dock icon while no window is open.
+    var effectiveDockIcon: DockIconMode {
+        !showInMenuBar && dockIcon == .never ? .withWindows : dockIcon
+    }
+}
+
+/// When Forma shows an icon in the Dock.
+enum DockIconMode: String, Codable, CaseIterable, Identifiable, Sendable {
+    case always, withWindows, never
+    var id: String { rawValue }
+}
+
+/// What the global shortcut does.
+enum HotKeyAction: String, Codable, CaseIterable, Identifiable, Sendable {
+    case menuBarPanel, mainWindow
+    var id: String { rawValue }
+    var label: String { self == .menuBarPanel ? "Le panneau de la barre des menus" : "La fenêtre principale" }
+}
+
+/// A system-wide shortcut (Carbon key code + Carbon modifier mask), with its display string ("⌃⌥F").
+struct GlobalHotKey: Codable, Equatable, Sendable {
+    var keyCode: UInt32
+    var modifiers: UInt32
+    var display: String
 }
 
 /// How jobs started outside the main window report progress.
@@ -544,7 +579,7 @@ struct FinderPreferences: Codable, Equatable, Sendable {
     var revealWhenDone = false
     /// Results of items shared without a file on disk (Safari, Photos…). nil = Downloads.
     var sharesFolder: String? = nil
-    /// "Mode discret": no Dock icon while no Forma window is open.
+    /// Forma ≤ 1.4 "mode discret" (no Dock icon while no window is open). Only read to migrate into `dockIcon`.
     var hideDockIconWithoutWindows = false
 
     func favorites(for kind: MediaKind) -> [String] { favorites[kind.rawValue] ?? MenuConfig.defaultFavorites[kind.rawValue] ?? [] }
@@ -568,6 +603,12 @@ final class PreferencesStore {
             if prefs.showInMenuBar != menuBarVisible { menuBarVisible = prefs.showInMenuBar }
             if prefs.appearance != appearance { appearance = prefs.appearance }
             if prefs.historyEnabled != oldValue.historyEnabled { HistoryStore.shared.enabled = prefs.historyEnabled }
+            if prefs.effectiveDockIcon != oldValue.effectiveDockIcon {
+                DispatchQueue.main.async { LaunchContext.updateDockPolicy(animated: true) }
+            }
+            if prefs.globalHotKey != oldValue.globalHotKey {
+                DispatchQueue.main.async { GlobalHotKeyCenter.shared.reload() }
+            }
         }
     }
     /// Mirrors used by scene-level code so the App body doesn't re-evaluate on every settings change.
@@ -584,6 +625,11 @@ final class PreferencesStore {
             if let raw = try? JSONSerialization.jsonObject(with: data) as? [String: Any], raw["clipboard"] == nil {
                 loaded.clipboard = ClipboardSettings.migrated(enabled: p.clipboardEnabled, target: p.clipboardTarget,
                                                               maxDimension: p.clipboardMaxDimension, quality: p.clipboardQuality)
+            }
+            // 1.5: the Finder tab's "mode discret" became the Dock setting of the General tab.
+            if let raw = try? JSONSerialization.jsonObject(with: data) as? [String: Any], raw["dockIcon"] == nil,
+               p.finder.hideDockIconWithoutWindows {
+                loaded.dockIcon = .withWindows
             }
         }
         prefs = loaded

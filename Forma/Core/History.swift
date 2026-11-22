@@ -92,6 +92,28 @@ struct HistoryEntry: Identifiable, Hashable, Sendable {
     }
 }
 
+/// A file sent to Drop (kept even when the history is off: it is the only way to find the link again).
+struct DropRecord: Identifiable, Hashable, Sendable {
+    var key: String
+    var date: Date
+    var name: String
+    var url: String
+    var size: Int64
+    var expiresAt: Date?
+    var origin: HistoryOrigin
+    var batch: UUID?
+    /// The history entry that produced the file (conversion → upload); `nil` for plain uploads.
+    var entry: UUID?
+    var source: String?
+    var server: String
+    var deletedAt: Date?
+
+    var id: String { key }
+    var isDeleted: Bool { deletedAt != nil }
+    var isExpired: Bool { expiresAt.map { $0 <= Date() } ?? false }
+    var isLive: Bool { !isDeleted && !isExpired }
+}
+
 extension Notification.Name {
     /// Posted (also as a distributed notification, for the CLI and companion apps) when the history changes.
     static let formaHistoryChanged = Notification.Name("com.thibault.forma.historyChanged")
@@ -155,6 +177,25 @@ final class HistoryStore: @unchecked Sendable {
         """)
         exec("CREATE INDEX IF NOT EXISTS entries_date ON entries(date DESC)")
         exec("CREATE INDEX IF NOT EXISTS entries_batch ON entries(batch)")
+        exec("""
+        CREATE TABLE IF NOT EXISTS drops(
+            key TEXT PRIMARY KEY,
+            date REAL NOT NULL,
+            name TEXT NOT NULL,
+            url TEXT NOT NULL,
+            size INTEGER NOT NULL,
+            expires_at REAL,
+            origin TEXT NOT NULL,
+            batch TEXT,
+            entry TEXT,
+            source TEXT,
+            server TEXT NOT NULL DEFAULT '',
+            deleted_at REAL
+        )
+        """)
+        exec("CREATE INDEX IF NOT EXISTS drops_date ON drops(date DESC)")
+        exec("CREATE INDEX IF NOT EXISTS drops_entry ON drops(entry)")
+        exec("CREATE INDEX IF NOT EXISTS drops_batch ON drops(batch)")
     }
 
     deinit { sqlite3_close_v2(db) }
@@ -266,6 +307,83 @@ final class HistoryStore: @unchecked Sendable {
             }
             return out
         }
+    }
+
+    // MARK: Drop uploads
+
+    func recordDrop(_ d: DropRecord) {
+        queue.sync {
+            run("INSERT OR REPLACE INTO drops(key,date,name,url,size,expires_at,origin,batch,entry,source,server,deleted_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,NULL)") { st in
+                self.bind(st, 1, d.key)
+                sqlite3_bind_double(st, 2, d.date.timeIntervalSince1970)
+                self.bind(st, 3, d.name)
+                self.bind(st, 4, d.url)
+                sqlite3_bind_int64(st, 5, d.size)
+                if let e = d.expiresAt { sqlite3_bind_double(st, 6, e.timeIntervalSince1970) } else { sqlite3_bind_null(st, 6) }
+                self.bind(st, 7, d.origin.rawValue)
+                self.bind(st, 8, d.batch?.uuidString)
+                self.bind(st, 9, d.entry?.uuidString)
+                self.bind(st, 10, d.source)
+                self.bind(st, 11, d.server)
+            }
+        }
+        Self.postChange()
+    }
+
+    /// Newest first. `includeDeleted` keeps the links removed from the server (greyed out in the list).
+    func fetchDrops(limit: Int = 500, includeDeleted: Bool = false, entries: [UUID]? = nil, batch: UUID? = nil) -> [DropRecord] {
+        queue.sync {
+            guard let db else { return [] }
+            var clauses: [String] = []
+            if !includeDeleted { clauses.append("deleted_at IS NULL") }
+            if let entries { clauses.append("entry IN (\(entries.map { "'\($0.uuidString)'" }.joined(separator: ",")))") }
+            if batch != nil { clauses.append("batch = ?") }
+            let whereSQL = clauses.isEmpty ? "" : "WHERE " + clauses.joined(separator: " AND ")
+            if let entries, entries.isEmpty { return [] }
+            var st: OpaquePointer?
+            let sql = "SELECT key,date,name,url,size,expires_at,origin,batch,entry,source,server,deleted_at FROM drops \(whereSQL) ORDER BY date DESC LIMIT ?"
+            guard sqlite3_prepare_v2(db, sql, -1, &st, nil) == SQLITE_OK else { return [] }
+            defer { sqlite3_finalize(st) }
+            var i: Int32 = 1
+            if let batch { bind(st, i, batch.uuidString); i += 1 }
+            sqlite3_bind_int(st, i, Int32(limit))
+            var out: [DropRecord] = []
+            while sqlite3_step(st) == SQLITE_ROW {
+                guard let key = text(st, 0), let name = text(st, 2), let url = text(st, 3) else { continue }
+                out.append(DropRecord(
+                    key: key, date: Date(timeIntervalSince1970: sqlite3_column_double(st, 1)), name: name, url: url,
+                    size: sqlite3_column_int64(st, 4),
+                    expiresAt: sqlite3_column_type(st, 5) == SQLITE_NULL ? nil : Date(timeIntervalSince1970: sqlite3_column_double(st, 5)),
+                    origin: HistoryOrigin(rawValue: text(st, 6) ?? "") ?? .app,
+                    batch: text(st, 7).flatMap(UUID.init(uuidString:)), entry: text(st, 8).flatMap(UUID.init(uuidString:)),
+                    source: text(st, 9), server: text(st, 10) ?? "",
+                    deletedAt: sqlite3_column_type(st, 11) == SQLITE_NULL ? nil : Date(timeIntervalSince1970: sqlite3_column_double(st, 11))))
+            }
+            return out
+        }
+    }
+
+    func markDropsDeleted(_ keys: [String], at date: Date = Date()) {
+        guard !keys.isEmpty else { return }
+        queue.sync {
+            for k in keys {
+                run("UPDATE drops SET deleted_at=? WHERE key=?") { st in
+                    sqlite3_bind_double(st, 1, date.timeIntervalSince1970)
+                    self.bind(st, 2, k)
+                }
+            }
+        }
+        Self.postChange()
+    }
+
+    func updateDropExpiry(key: String, to date: Date?) {
+        queue.sync {
+            run("UPDATE drops SET expires_at=? WHERE key=?") { st in
+                if let date { sqlite3_bind_double(st, 1, date.timeIntervalSince1970) } else { sqlite3_bind_null(st, 1) }
+                self.bind(st, 2, key)
+            }
+        }
+        Self.postChange()
     }
 
     // MARK: Helpers

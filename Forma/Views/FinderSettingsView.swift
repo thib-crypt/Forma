@@ -137,8 +137,9 @@ struct FinderSettingsView: View {
                 Text(store.prefs.finder.sharesFolderURL.lastPathComponent).foregroundStyle(.secondary)
                 Button("Choisir…") { if let u = chooseFolder() { store.prefs.finder.sharesFolder = u.path } }
             }
-            Toggle("Masquer Forma du Dock quand aucune fenêtre n'est ouverte", isOn: $store.prefs.finder.hideDockIconWithoutWindows)
-                .onChange(of: store.prefs.finder.hideDockIconWithoutWindows) { LaunchContext.updateDockPolicy() }
+            LabeledContent("Icône du Dock") {
+                Button("Réglages de présence…") { SettingsNavigation.shared.tab = .general; AppDelegate.showSettings() }
+            }
         } header: {
             Text("Travaux lancés du Finder, du menu Partager et des services")
         } footer: {
@@ -365,6 +366,23 @@ struct RecipeEditor: View {
                                                                                     set: { recipe.overrides.replaceOriginals = $0 ? true : nil }))
                     }
                 }
+                Section {
+                    Toggle("Envoyer les résultats sur Drop", isOn: Binding(get: { recipe.drop != nil },
+                                                                           set: { recipe.drop = $0 ? DropOptions() : nil }))
+                        .disabled(!DropServer.isConfigured(PreferencesStore.shared.prefs.drop) && recipe.drop == nil)
+                    if recipe.drop != nil {
+                        Picker("Expiration du lien", selection: Binding(get: { recipe.drop?.expiry }, set: { recipe.drop?.expiry = $0 })) {
+                            Text("Selon Réglages › Drop").tag(DropExpiry?.none)
+                            ForEach(DropExpiry.allCases) { Text($0.label).tag(Optional($0)) }
+                        }
+                    }
+                } header: {
+                    Text("Drop")
+                } footer: {
+                    Text(DropServer.isConfigured(PreferencesStore.shared.prefs.drop)
+                         ? "Chaque résultat est envoyé dès qu'il est prêt, et le lien est copié dans le presse-papiers. Le fichier reste aussi à côté de l'original."
+                         : "Configurez d'abord le serveur dans Réglages › Drop.")
+                }
                 Section("Destination & visibilité") {
                     Picker("Résultats", selection: $recipe.destination) {
                         Text("Selon les réglages").tag(RequestDestination.standard)
@@ -396,7 +414,7 @@ struct RecipeEditor: View {
             }
             .padding()
         }
-        .frame(width: 500, height: 620)
+        .frame(width: 500, height: 700)
     }
 
     private func target(_ kind: MediaKind) -> Binding<String> {

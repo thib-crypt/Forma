@@ -20,14 +20,22 @@ struct JobPlan: Sendable {
     var reveal: Bool
     var origin: HistoryOrigin
     var recipeName: String?
+    /// Send the results to Drop (nil = no upload).
+    var drop: DropOptions?
+    /// `.upload` requests: files (or folders, zipped) sent as they are, without processing.
+    var uploads: [URL] = []
 }
 
 enum RequestPlanner {
     enum PlanError: LocalizedError {
         case unknownRecipe
         case unknownFormat(String)
+        case dropUnavailable
+        case untrusted
         var errorDescription: String? {
             switch self {
+            case .dropUnavailable: DropError.notConfigured.localizedDescription
+            case .untrusted: "Un lien forma:// ne peut pas envoyer de fichiers sur Drop."
             case .unknownRecipe: "Cette recette n'existe plus."
             case .unknownFormat(let f): "Format inconnu : \(f)."
             }
@@ -37,6 +45,7 @@ enum RequestPlanner {
     /// Expands folders (disk I/O: call off the main thread for big folders).
     /// `trusted` is false for `forma://convert?…` URLs, which any web page can open: they can never touch originals.
     static func plan(_ r: ExternalRequest, prefs: Preferences, trusted: Bool = true) throws -> JobPlan {
+        if r.action == .upload { return try planUpload(r, prefs: prefs, trusted: trusted) }
         var snap = prefs.processing
         var mode = r.mode
         var recipe: Recipe?
@@ -101,7 +110,18 @@ enum RequestPlanner {
         if staged != nil || files.contains(where: { $0.outputFolder == sharesFolder }) { snap.output.replaceOriginals = false; snap.output.deleteOriginals = false }
 
         let title = recipe.map { "Recette « \($0.name) »" } ?? Self.title(mode: mode, target: fixedTarget, preset: r.overrides?.preset)
-        let origin: HistoryOrigin = switch r.source {
+        // Public `forma://` links never reach Drop: any web page can open them.
+        let dropOptions = trusted ? (r.drop ?? recipe?.drop) : nil
+        if dropOptions != nil, !DropServer.isConfigured(prefs.drop) { throw PlanError.dropUnavailable }
+        let linkReplacesFiles = dropOptions.map { $0.copyLink ?? prefs.drop.copyLink } ?? false
+        return JobPlan(mode: mode, snapshot: snap, files: files, ignored: ignored, title: dropOptions == nil ? title : title + " → Drop",
+                       copyToClipboard: destination == .clipboard && !linkReplacesFiles,
+                       reveal: r.reveal ?? (external.contains(r.source) ? prefs.finder.revealWhenDone : prefs.processing.output.revealWhenDone),
+                       origin: origin(of: r.source), recipeName: recipe?.name, drop: dropOptions)
+    }
+
+    static func origin(of source: RequestSource) -> HistoryOrigin {
+        switch source {
         case .finder: .finder
         case .share: .share
         case .service: .service
@@ -110,10 +130,24 @@ enum RequestPlanner {
         case .menuBar: .menuBar
         case .shortcut: .shortcut
         }
-        return JobPlan(mode: mode, snapshot: snap, files: files, ignored: ignored, title: title,
-                       copyToClipboard: destination == .clipboard,
-                       reveal: r.reveal ?? (external.contains(r.source) ? prefs.finder.revealWhenDone : prefs.processing.output.revealWhenDone),
-                       origin: origin, recipeName: recipe?.name)
+    }
+
+    /// Files are sent untouched; folders (and packages) become one zip each. No file type is refused.
+    private static func planUpload(_ r: ExternalRequest, prefs: Preferences, trusted: Bool) throws -> JobPlan {
+        guard trusted else { throw PlanError.untrusted }
+        guard DropServer.isConfigured(prefs.drop) else { throw PlanError.dropUnavailable }
+        var seen = Set<String>()
+        var uploads: [URL] = []
+        var ignored = 0
+        for p in r.paths {
+            let url = URL(fileURLWithPath: p)
+            guard seen.insert(url.standardizedFileURL.path).inserted else { continue }
+            guard FileManager.default.fileExists(atPath: url.path), !url.lastPathComponent.hasPrefix(".") else { ignored += 1; continue }
+            uploads.append(url)
+        }
+        let title = uploads.count == 1 ? "Envoi de « \(uploads[0].lastPathComponent) »" : "Envoi sur Drop"
+        return JobPlan(mode: .convert, snapshot: prefs.processing, files: [], ignored: ignored, title: title, copyToClipboard: false,
+                       reveal: false, origin: origin(of: r.source), recipeName: nil, drop: r.drop ?? DropOptions(), uploads: uploads)
     }
 
     static func title(mode: ProcessMode, target: FormatDescriptor?, preset: CompressionPreset? = nil) -> String {

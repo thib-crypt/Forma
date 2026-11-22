@@ -6,6 +6,9 @@ enum WorkLimits {
     static let images = AsyncLimiter(SystemInfo.imageParallelism(requested: PreferencesStore.loadSnapshot().maxParallelImages))
     static let media = AsyncLimiter(max(1, PreferencesStore.loadSnapshot().maxParallelVideos))
 
+    /// Uploads to Drop: two at a time, independent of the CPU lanes (the network is the bottleneck).
+    static let uploads = AsyncLimiter(2)
+
     static func limiter(for kind: MediaKind) -> AsyncLimiter { kind == .video || kind == .audio ? media : images }
 
     /// Runs one pipeline call inside a slot of the right lane.
@@ -52,37 +55,76 @@ final class BackgroundJob: Identifiable {
     var trusted = true
     fileprivate var task: Task<Void, Never>?
 
+    // Drop
+    var dropOptions: DropOptions?
+    /// `.upload` request: nothing is processed, the files are sent as they are.
+    var isUploadOnly: Bool { request.action == .upload }
+    var uploads: [DropUpload] = []
+    var uploading: [URL: Double] = [:]
+    /// Uploads started so far (a PDF split into pages produces several files for one input).
+    var uploadsStarted = 0
+    /// Failures of the upload step; they are also in `failures`.
+    var uploadFailureCount = 0
+    var linksCopied = false
+    var linksDeleted = false
+    fileprivate var uploadTasks: [Task<Void, Never>] = []
+    var links: [String] { uploads.map(\.url) }
+    var sendsToDrop: Bool { dropOptions != nil }
+
     init(request: ExternalRequest) {
         id = request.id
         self.request = request
         mode = request.mode
-        title = RequestPlanner.title(mode: request.mode, target: request.target.flatMap(FormatCatalog.format), preset: request.overrides?.preset)
+        title = request.action == .upload ? "Envoi sur Drop"
+            : RequestPlanner.title(mode: request.mode, target: request.target.flatMap(FormatCatalog.format), preset: request.overrides?.preset)
     }
 
     var isActive: Bool { state == .preparing || state == .running }
     var isDone: Bool { state == .finished || state == .cancelled }
-    var processed: Int { completed + unchanged + failures.count }
+    var processed: Int { completed + unchanged + failures.count - uploadFailureCount }
+    var uploadsDone: Int { uploads.count + uploadFailureCount }
     var fraction: Double {
         guard total > 0 else { return state == .finished ? 1 : 0 }
-        return min(1, (Double(processed) + running.values.reduce(0, +)) / Double(total))
+        let process = isUploadOnly ? 1 : min(1, (Double(processed) + running.values.reduce(0, +)) / Double(total))
+        guard sendsToDrop else { return process }
+        let expected = Double(max(total, uploadsStarted))
+        let upload = min(1, (Double(uploadsDone) + uploading.values.reduce(0, +)) / expected)
+        return isUploadOnly ? upload : (process + upload) / 2
     }
     var savings: Double? {
         guard mode != .upscale, bytesIn > 0, bytesOut > 0 else { return nil }
         return 1 - Double(bytesOut) / Double(bytesIn)
     }
-    var currentNames: String { running.keys.map(\.lastPathComponent).sorted().joined(separator: ", ") }
+    var currentNames: String {
+        let names = running.keys.map(\.lastPathComponent).sorted()
+        if !names.isEmpty { return names.joined(separator: ", ") }
+        let sending = uploading.keys.map(\.lastPathComponent).sorted()
+        return sending.isEmpty ? "" : "Envoi · " + sending.joined(separator: ", ")
+    }
+    /// Phase shown in the progress panel.
+    var isSending: Bool { running.isEmpty && !uploading.isEmpty }
     var elapsed: TimeInterval { (finishedAt ?? Date()).timeIntervalSince(startedAt ?? Date()) }
 
     /// "12 fichiers · −64 %"
     var summary: String {
+        if isUploadOnly {
+            if state == .cancelled { return "Annulé · \(uploads.count) sur \(total) envoyé\(uploads.count > 1 ? "s" : "")" }
+            if total == 0 { return failures.first?.message ?? "Aucun fichier à envoyer" }
+            var s = uploads.isEmpty ? "Aucun fichier envoyé" : "\(uploads.count) fichier\(uploads.count > 1 ? "s" : "") envoyé\(uploads.count > 1 ? "s" : "") sur Drop"
+            let bytes = uploads.reduce(Int64(0)) { $0 + $1.size }
+            if bytes > 0, !uploads.isEmpty { s += " · \(bytes.formattedBytes)" }
+            if !failures.isEmpty { s += " · \(failures.count) échec\(failures.count > 1 ? "s" : "")" }
+            return s
+        }
         if state == .cancelled { return "Annulé · \(completed) sur \(total) traité\(completed > 1 ? "s" : "")" }
         if total == 0 { return failures.first?.message ?? "Aucun fichier compatible" }
         var s = "\(completed) fichier\(completed > 1 ? "s" : "")"
         if let v = savings, v > 0.005 { s += " · −\(Int((v * 100).rounded())) %" }
         else if mode == .upscale { s += " · ×2" }
         if unchanged > 0 { s += " · \(unchanged) déjà optimisé\(unchanged > 1 ? "s" : "")" }
+        if sendsToDrop, !uploads.isEmpty { s += " · \(uploads.count == 1 ? "lien Drop prêt" : "\(uploads.count) liens Drop") " }
         if !failures.isEmpty { s += " · \(failures.count) échec\(failures.count > 1 ? "s" : "")" }
-        return s
+        return s.trimmingCharacters(in: .whitespaces)
     }
 }
 
@@ -125,6 +167,7 @@ final class JobCenter {
             finish(job)
         } else {
             job.task?.cancel()
+            job.uploadTasks.forEach { $0.cancel() }
         }
     }
 
@@ -134,8 +177,20 @@ final class JobCenter {
     @discardableResult
     func undo(_ job: BackgroundJob) -> String {
         let entries = HistoryStore.shared.fetch().filter { $0.batch == job.batch && !$0.isUndone }
-        guard !entries.isEmpty else { NSSound.beep(); return "Rien à annuler" }
-        let msg = HistoryModel.shared.undo(entries)
+        // Links without a history entry (plain uploads) are deleted here; the others go with their conversion.
+        let plain = HistoryStore.shared.fetchDrops(batch: job.batch).filter { $0.entry == nil }
+        guard !entries.isEmpty || !plain.isEmpty else { NSSound.beep(); return "Rien à annuler" }
+        var msg = entries.isEmpty ? "" : HistoryModel.shared.undo(entries)
+        if !plain.isEmpty {
+            let prefs = PreferencesStore.shared.prefs.drop
+            Task {
+                let failed = await DropUploader.delete(plain, prefs: prefs)
+                Toast.show(failed.isEmpty ? "Supprimé de Drop" : "\(failed.count) fichier\(failed.count > 1 ? "s" : "") non supprimé\(failed.count > 1 ? "s" : "") de Drop",
+                           symbol: failed.isEmpty ? "trash" : "exclamationmark.triangle")
+            }
+            msg = msg.isEmpty ? "Suppression de \(plain.count) lien\(plain.count > 1 ? "s" : "") Drop…" : msg
+            job.linksDeleted = true
+        }
         job.undone = true
         MenuConfigPublisher.shared.setNeedsPublish()
         return msg
@@ -169,8 +224,17 @@ final class JobCenter {
     private func execute(_ job: BackgroundJob, plan: JobPlan) async {
         job.title = plan.title
         job.mode = plan.mode
-        job.total = plan.files.count
+        job.dropOptions = plan.drop
         job.ignored = plan.ignored
+        if job.isUploadOnly {
+            job.total = plan.uploads.count
+            job.state = .running
+            guard !plan.uploads.isEmpty, !Task.isCancelled else { return }
+            for url in plan.uploads { startUpload(url, job: job, entry: nil) }
+            await finishUploads(job)
+            return
+        }
+        job.total = plan.files.count
         job.state = .running
         guard !plan.files.isEmpty, !Task.isCancelled else { return }
         let prefs = PreferencesStore.shared.prefs
@@ -182,6 +246,7 @@ final class JobCenter {
             group.addTask { await self.lane(images, width: imageWidth, job: job, plan: plan) }
             group.addTask { await self.lane(media, width: mediaWidth, job: job, plan: plan) }
         }
+        await finishUploads(job)
         if Task.isCancelled { return }
         if plan.copyToClipboard, !job.outputs.isEmpty {
             let pb = NSPasteboard.general
@@ -231,9 +296,58 @@ final class JobCenter {
                 job.bytesOut += r.outputSize
             }
             if let h = r.historyID { job.historyIDs.append(h) }
+            // Upload as soon as a file is ready: the next conversions keep running meanwhile.
+            if job.sendsToDrop { for out in r.outputs { startUpload(out, job: job, entry: r.historyID) } }
         case .failure(let e):
             if e is CancellationError || Task.isCancelled { return }
             job.failures.append(JobFailure(url: url, message: e.localizedDescription))
+        }
+    }
+
+    // MARK: Drop
+
+    private func startUpload(_ url: URL, job: BackgroundJob, entry: UUID?) {
+        guard let options = job.dropOptions, !Task.isCancelled else { return }
+        let prefs = PreferencesStore.shared.prefs.drop
+        let origin = RequestPlanner.origin(of: job.request.source)
+        let batch = job.batch
+        job.uploadsStarted += 1
+        let task = Task { @MainActor in
+            let result: Result<DropUpload, Error> = await WorkLimits.uploads.run {
+                if Task.isCancelled { return .failure(CancellationError()) }
+                await MainActor.run { job.uploading[url] = 0.02 }
+                do {
+                    let up = try await DropUploader.upload(url, options: options, prefs: prefs, origin: origin, batch: batch, entry: entry) { p in
+                        Task { @MainActor in if job.uploading[url] != nil { job.uploading[url] = max(0.02, p) } }
+                    }
+                    return .success(up)
+                } catch { return .failure(error) }
+            }
+            job.uploading[url] = nil
+            switch result {
+            case .success(let up): job.uploads.append(up)
+            case .failure(let e):
+                if e is CancellationError || Task.isCancelled { return }
+                job.uploadFailureCount += 1
+                job.failures.append(JobFailure(url: url, message: e.localizedDescription))
+            }
+        }
+        job.uploadTasks.append(task)
+    }
+
+    /// Waits for the uploads, then copies the link(s) and opens them if asked.
+    private func finishUploads(_ job: BackgroundJob) async {
+        for t in job.uploadTasks { await t.value }
+        job.uploadTasks.removeAll()
+        guard let options = job.dropOptions, !Task.isCancelled else { return }
+        job.uploads.sort { $0.source.path.localizedStandardCompare($1.source.path) == .orderedAscending }
+        let prefs = PreferencesStore.shared.prefs.drop
+        if !job.uploads.isEmpty, options.copyLink ?? prefs.copyLink {
+            DropUploader.copy(job.links)
+            job.linksCopied = true
+        }
+        if options.openLink ?? prefs.openLink, job.uploads.count == 1, let u = URL(string: job.uploads[0].url) {
+            NSWorkspace.shared.open(u)
         }
     }
 

@@ -164,10 +164,11 @@ private struct RunningCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                Image(systemName: job.mode.symbol)
+                Image(systemName: job.isUploadOnly || job.isSending ? "arrow.up.circle.fill" : job.mode.symbol)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.tint)
                     .symbolEffect(.pulse, isActive: job.state == .running)
+                    .contentTransition(.symbolEffect(.replace))
                 Text(job.title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
                 Spacer(minLength: 4)
                 if job.total > 0 {
@@ -217,7 +218,19 @@ private struct FinishedCard: View {
                     .buttonStyle(PanelIconButtonStyle(size: 22))
                     .help("Fermer")
             }
-            if !job.outputs.isEmpty, !job.undone {
+            if !job.uploads.isEmpty, !job.linksDeleted { DropLinksRow(job: job) }
+            if job.isUploadOnly, !job.uploads.isEmpty, !job.undone {
+                ResultStrip(urls: job.uploads.map(\.source))
+                HStack(spacing: 6) {
+                    Button { undoMessage = JobCenter.shared.undo(job) } label: {
+                        Label("Supprimer de Drop", systemImage: "trash")
+                    }
+                    Button { NSWorkspace.shared.activateFileViewerSelecting(job.uploads.map(\.source)) } label: {
+                        Label("Afficher", systemImage: "magnifyingglass")
+                    }
+                }
+                .buttonStyle(PanelCapsuleButtonStyle())
+            } else if !job.outputs.isEmpty, !job.undone {
                 ResultStrip(urls: job.outputs)
                 HStack(spacing: 6) {
                     Button { NSWorkspace.shared.activateFileViewerSelecting(job.outputs) } label: {
@@ -253,6 +266,48 @@ private struct FinishedCard: View {
         if job.bytesIn > job.bytesOut, job.mode != .upscale { parts.append("\((job.bytesIn - job.bytesOut).formattedBytes) économisés") }
         if job.ignored > 0 { parts.append("\(job.ignored) ignoré\(job.ignored > 1 ? "s" : "")") }
         return parts.joined(separator: " · ")
+    }
+}
+
+/// The links of a job that sent files to Drop: copy / open buttons per link.
+private struct DropLinksRow: View {
+    let job: BackgroundJob
+    @State private var copied: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            if job.linksCopied {
+                Label(job.uploads.count > 1 ? "Liens copiés dans le presse-papiers" : "Lien copié dans le presse-papiers", systemImage: "doc.on.clipboard.fill")
+                    .font(.system(size: 11, weight: .medium)).foregroundStyle(.green)
+            }
+            ForEach(job.uploads.prefix(4)) { up in
+                HStack(spacing: 6) {
+                    Image(systemName: "link").font(.system(size: 10.5, weight: .semibold)).foregroundStyle(.tint)
+                    Text(display(up.url)).font(.system(size: 11.5, design: .monospaced)).lineLimit(1).truncationMode(.middle)
+                        .help(up.url)
+                    Spacer(minLength: 2)
+                    Button {
+                        DropUploader.copy([up.url])
+                        copied = up.key
+                    } label: { Image(systemName: copied == up.key ? "checkmark" : "doc.on.doc") }
+                        .buttonStyle(PanelIconButtonStyle(size: 22)).help("Copier le lien")
+                    Button { if let u = URL(string: up.url) { NSWorkspace.shared.open(u) } } label: { Image(systemName: "arrow.up.right.square") }
+                        .buttonStyle(PanelIconButtonStyle(size: 22)).help("Ouvrir dans le navigateur")
+                }
+            }
+            if job.uploads.count > 4 {
+                HStack {
+                    Text("+ \(job.uploads.count - 4) autres").font(.system(size: 11)).foregroundStyle(.tertiary)
+                    Spacer()
+                    Button("Copier tous les liens") { DropUploader.copy(job.links); copied = "all" }
+                        .buttonStyle(PanelCapsuleButtonStyle())
+                }
+            }
+        }
+    }
+
+    private func display(_ url: String) -> String {
+        url.replacingOccurrences(of: "https://", with: "").replacingOccurrences(of: "http://", with: "")
     }
 }
 

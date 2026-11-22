@@ -61,7 +61,13 @@ final class MenuBarController: NSObject {
     func install() {
         observeVisibility()
         observeIcon()
+        // Displays added/removed, resolution or menu bar height changes: keep the open panel under the icon.
+        NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { MenuBarController.shared.reposition() }
+        }
     }
+
+
 
     private func observeVisibility() {
         let visible = withObservationTracking { PreferencesStore.shared.menuBarVisible } onChange: {
@@ -166,6 +172,13 @@ final class MenuBarController: NSObject {
         menu.autoenablesItems = false
         menu.addItem(undo)
         menu.addItem(.separator())
+        let store = PreferencesStore.shared
+        let inDock = ClosureMenuItem(title: "Afficher dans le Dock", keyEquivalent: "") {
+            store.prefs.dockIcon = store.prefs.dockIcon == .always ? .never : .always
+        }
+        inDock.state = store.prefs.dockIcon == .always ? .on : .off
+        menu.addItem(inDock)
+        menu.addItem(.separator())
         add("Quitter Forma", "power", key: "q") { NSApp.terminate(nil) }
         menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.height + 6), in: button)
     }
@@ -175,33 +188,31 @@ final class MenuBarController: NSObject {
     func toggle() { state.isOpen ? close() : open() }
 
     func open(animated: Bool = true) {
-        guard let button = statusItem?.button, let anchor = button.window else { return }
+        guard let button = statusItem?.button, button.window != nil else { return }
         let panel = self.panel ?? makePanel()
         self.panel = panel
         panel.appearance = Self.appearance
         if state.isOpen {
+            reposition()
             panel.makeKey()
             return
         }
         state.isOpen = true
-        let target = frame(for: panel, below: anchor.frame, height: contentHeight > 1 ? contentHeight : nil)
-        let reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
-        if animated {
-            panel.alphaValue = 0
-            panel.setFrame(reduceMotion ? target : target.offsetBy(dx: 0, dy: 8), display: false)
-        } else {
-            panel.alphaValue = 1
-            panel.setFrame(target, display: false)
-        }
+        // Settle SwiftUI's layout first, so the frame is computed with the current content height.
+        panel.contentView?.layoutSubtreeIfNeeded()
+        reposition()
+        let fade = animated && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        panel.alphaValue = fade ? 0 : 1
         panel.orderFrontRegardless()
         panel.makeKey()
         button.highlight(true)
-        if animated {
+        // Only the opacity is animated. Animating the frame raced with height updates arriving mid-animation:
+        // the animation then finished on a stale frame and the panel ended up too tall / too low.
+        if fade {
             NSAnimationContext.runAnimationGroup { ctx in
-                ctx.duration = 0.2
+                ctx.duration = 0.16
                 ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.25, 1)
                 panel.animator().alphaValue = 1
-                panel.animator().setFrame(target, display: true)
             }
         }
         installMonitors()
@@ -214,9 +225,9 @@ final class MenuBarController: NSObject {
         springLoaded = false
         removeMonitors()
         statusItem?.button?.highlight(false)
-        guard animated else { panel.orderOut(nil); return }
+        guard animated else { panel.alphaValue = 1; panel.orderOut(nil); return }
         NSAnimationContext.runAnimationGroup({ ctx in
-            ctx.duration = 0.14
+            ctx.duration = 0.12
             ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
             panel.animator().alphaValue = 0
         }, completionHandler: {
@@ -245,7 +256,9 @@ final class MenuBarController: NSObject {
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { h in
                 MenuBarController.shared.contentHeightChanged(h)
             }
-            .frame(maxHeight: .infinity, alignment: .top)
+            // minHeight 0: the content stays pinned to the top even if it is momentarily taller than the panel
+            // (otherwise SwiftUI centres the overflow and the whole panel looks shifted down).
+            .frame(minHeight: 0, maxHeight: .infinity, alignment: .top)
         let host = NSHostingView(rootView: root)
         host.sizingOptions = []
 
@@ -264,27 +277,34 @@ final class MenuBarController: NSObject {
         guard height > 1 else { return }
         contentHeight = ceil(height)
         guard let panel else { return }
-        let h = ceil(height)
-        var f = panel.frame
-        guard abs(f.height - h) > 0.5 else { return }
-        if let anchor = statusItem?.button?.window, state.isOpen {
-            let target = frame(for: panel, below: anchor.frame, height: h)
-            f = target
-        } else {
-            f.origin.y += f.height - h
-            f.size.height = h
+        if state.isOpen {
+            reposition()
+        } else if abs(panel.frame.height - contentHeight) > 0.5 {
+            var f = panel.frame
+            f.origin.y += f.height - contentHeight
+            f.size.height = contentHeight
+            panel.setFrame(f, display: false)
         }
-        panel.setFrame(f, display: true)
+    }
+
+    /// Puts the open panel right under the status item, at the content's current height.
+    func reposition() {
+        guard state.isOpen, let panel, let anchor = statusItem?.button?.window else { return }
+        let target = frame(for: panel, below: anchor.frame, height: contentHeight > 1 ? contentHeight : nil)
+        guard panel.frame != target else { return }
+        panel.setFrame(target, display: true)
         panel.invalidateShadow()
     }
 
     private func frame(for panel: NSPanel, below anchor: NSRect, height: CGFloat? = nil) -> NSRect {
-        let size = NSSize(width: Self.width, height: height ?? panel.frame.height)
+        var size = NSSize(width: Self.width, height: height ?? panel.frame.height)
         let screen = NSScreen.screens.first { $0.frame.contains(NSPoint(x: anchor.midX, y: anchor.midY)) } ?? NSScreen.main
         let visible = screen?.visibleFrame ?? .zero
         var x = anchor.midX - size.width / 2
         x = min(max(x, visible.minX + 8), visible.maxX - size.width - 8)
         let top = min(anchor.minY, visible.maxY) - 6
+        // Never run under the Dock on a small screen: the bottom is clipped instead (the content is top-aligned).
+        if visible.height > 0 { size.height = min(size.height, top - visible.minY - 8) }
         return NSRect(x: x, y: top - size.height, width: size.width, height: size.height)
     }
 
@@ -450,8 +470,26 @@ final class MenuBarController: NSObject {
         return true
     }
 
+    /// Files dropped on the "Envoyer sur Drop" strip: sent as they are, the link lands on the clipboard.
+    @discardableResult
+    func acceptDrop(_ urls: [URL]) -> Bool {
+        droppedDuringDrag = true
+        let files = urls.filter(\.isFileURL)
+        guard !files.isEmpty else {
+            NSSound.beep()
+            post(.init(text: "Rien à envoyer", symbol: "exclamationmark.circle", isError: true))
+            return false
+        }
+        guard DropActions.upload(files, source: .menuBar) else { return false }
+        post(.init(text: "\(files.count > 1 ? "\(files.count) éléments" : "1 élément") · Drop", symbol: "arrow.up.circle.fill"))
+        return true
+    }
+
     /// Status item menu › Recettes › X…: choose files, then run the recipe in the background.
     func apply(recipe: Recipe) {
+        // The panel floats at status-bar level: it would cover the open panel.
+        let wasOpen = state.isOpen
+        close(animated: false)
         NSApp.activate()
         let picker = NSOpenPanel()
         picker.allowsMultipleSelection = true
@@ -463,7 +501,7 @@ final class MenuBarController: NSObject {
         var r = ExternalRequest(source: .menuBar, action: .recipe, paths: picker.urls.map(\.path))
         r.recipe = recipe.id
         JobCenter.shared.submit(r)
-        open(animated: true)
+        if wasOpen { open(animated: true) }
     }
 
     /// Tile click: pick files with an open panel, then process them like a drop.
@@ -477,7 +515,7 @@ final class MenuBarController: NSObject {
         if mode == .upscale { picker.allowedContentTypes = [.image] }
         picker.message = "Fichiers à \(mode.label.lowercased()) — le traitement démarre aussitôt"
         picker.prompt = mode.label
-        guard picker.runModal() == .OK else { return }
+        guard picker.runModal() == .OK else { open(animated: true); return }
         accept(picker.urls, mode: mode)
         open(animated: true)
     }

@@ -63,6 +63,36 @@ Code shared by the three targets lives in `Forma/Shared/` (`MenuBuilder` is pure
 Since 1.3 Forma is signed with the Developer ID of team PG46BWSK3T (App Groups need it). macOS asks once again for
 Desktop / Documents / Downloads access and the login item may need re-enabling; after that, permissions survive rebuilds.
 
+## Drop (1.4)
+
+Integration with [Drop](../Drop), the self-hosted S3 share service. Settings › Drop takes the server address and the
+dashboard password (kept in the Keychain). Once connected:
+
+- **Finder** › Forma › *Envoyer sur Drop* (any file; a folder goes up as a `.zip`), with an expiry submenu and
+  *Compresser et envoyer sur Drop*. **Share** › Forma › *Envoyer*, **Services**, menu bar strip (drop files, or send the clipboard), ⇧⌘U / ⌥⌘U.
+- **Recipes** can send their results to Drop; the main window can send every result (bottom bar › ⋯).
+- The link is copied as soon as the upload ends (page or direct `?raw` link). HUD shows progress, copy/open/delete.
+- Every upload is logged locally (⇧⌘D opens the list; expiry and deletion are synced with the server). Undoing a
+  conversion also deletes its Drop link.
+- CLI: `forma drop <files> [--expiry 7d] [--direct]`, `forma drop login|status|list|rm|expire`, `--drop` on `convert`,
+  `compress`, `upscale`; `forma request upload …`. Shortcuts action *Envoyer sur Drop*.
+
+## Presence & windows (1.5)
+
+- **Where Forma lives** (Settings › Général › Présence): *Dock et barre des menus*, *Barre des menus* (no Dock icon, not in
+  ⌘⇥; optionally a Dock icon only while a window is open) or *Dock* (a classic app that quits with its last window).
+  Also from the menu bar icon's right-click menu and the panel's ⋯ menu (*Afficher dans le Dock*), and the Dock menu.
+- **Windows are owned by AppKit** (`WindowRouter`), no longer by SwiftUI scenes: they open from the Dock, the menu bar,
+  the Finder, a shortcut or a link, even after a headless launch. That fixes "Forma is in the Dock but shows no window"
+  (a headless launch never created the SwiftUI view that held `openWindow`). Closed windows keep their content and every
+  window remembers its size and position. Settings is a native toolbar-tab window.
+- **Launch**: a login launch stays in the menu bar; a manual launch opens the main window, or (option off) the menu bar
+  panel under its icon. Launches made for a `forma://` link stay in the background.
+- **Global shortcut** (recorded in Settings › Général): opens the menu bar panel or the main window from any app; press
+  again to close / hide.
+- **Dock**: a progress bar on the icon while Forma works (orange when paused), and a Dock menu (pause/stop, add files,
+  clipboard, history, Drop, undo).
+
 ## Engines
 Native first: ImageIO / Core Graphics (HEIC, AVIF, JPEG, PNG, TIFF, JP2, ICO, ICNS, PSD, EXR, DDS…), FFmpeg + VideoToolbox/AudioToolbox.
 Homebrew (optional): `brew install imagemagick ffmpeg ghostscript webp jpeg-xl mozjpeg pngquant oxipng gifsicle pandoc`,

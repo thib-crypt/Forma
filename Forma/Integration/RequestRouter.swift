@@ -16,17 +16,38 @@ enum LaunchContext {
         NSApp.windows.contains { $0.isVisible && $0.styleMask.contains(.titled) && !($0 is NSPanel) && $0.level == .normal }
     }
 
-    /// Regular app while a window is shown; accessory (no Dock icon) when headless or in "mode discret".
-    static func updateDockPolicy() {
-        let discreet = headless || PreferencesStore.shared.prefs.finder.hideDockIconWithoutWindows
-        let wanted: NSApplication.ActivationPolicy = hasVisibleWindow || !discreet ? .regular : .accessory
-        if NSApp.activationPolicy() != wanted { NSApp.setActivationPolicy(wanted) }
+    /// Dock icon rule (Settings › Général › Présence). A headless launch never shows one until a window opens.
+    static func desiredPolicy(windowShown: Bool) -> NSApplication.ActivationPolicy {
+        switch PreferencesStore.shared.prefs.effectiveDockIcon {
+        case .always: headless && !windowShown ? .accessory : .regular
+        case .withWindows: windowShown ? .regular : .accessory
+        case .never: .accessory
+        }
     }
 
-    /// The user opened a window: Forma is now an ordinary, interactive app.
+    static func updateDockPolicy(animated: Bool = false) {
+        apply(desiredPolicy(windowShown: hasVisibleWindow), keepFocus: animated)
+    }
+
+    /// The user opened a window: Forma is now an ordinary, interactive app (with or without a Dock icon).
     static func becomeInteractive() {
         headless = false
-        if NSApp.activationPolicy() != .regular { NSApp.setActivationPolicy(.regular) }
+        quitWork?.cancel()
+        apply(desiredPolicy(windowShown: true), keepFocus: false)
+    }
+
+    private static func apply(_ wanted: NSApplication.ActivationPolicy, keepFocus: Bool) {
+        guard NSApp.activationPolicy() != wanted else { return }
+        let key = NSApp.keyWindow
+        let wasActive = NSApp.isActive
+        NSApp.setActivationPolicy(wanted)
+        // Leaving the Dock deactivates the app on some systems: keep the window the user is looking at in front.
+        if keepFocus, wasActive, let key {
+            DispatchQueue.main.async {
+                NSApp.activate()
+                key.makeKeyAndOrderFront(nil)
+            }
+        }
     }
 
     private static var quitWork: DispatchWorkItem?
@@ -101,8 +122,12 @@ final class RequestRouter {
     }
 
     private func load(_ file: URL) {
-        defer { discard(file) }
-        guard let data = try? Data(contentsOf: file), let request = try? RequestCodec.decode(data) else {
+        // Claim the file first: rename is atomic, so if two Forma processes ever see the same request
+        // (a second copy launched by an extension), only one of them processes it.
+        let claimed = file.appendingPathExtension("claimed-\(ProcessInfo.processInfo.processIdentifier)")
+        guard rename(file.path, claimed.path) == 0 else { return }
+        defer { discard(claimed) }
+        guard let data = try? Data(contentsOf: claimed), let request = try? RequestCodec.decode(data) else {
             NSLog("Forma: unreadable request \(file.lastPathComponent)")
             return
         }
@@ -117,7 +142,7 @@ final class RequestRouter {
     func dispatch(_ r: ExternalRequest, trusted: Bool) {
         let urls = r.paths.map { URL(fileURLWithPath: $0) }
         switch r.action {
-        case .process, .recipe:
+        case .process, .recipe, .upload:
             JobCenter.shared.submit(r, trusted: trusted)
         case .open:
             LaunchContext.becomeInteractive()
@@ -132,6 +157,9 @@ final class RequestRouter {
         case .clipboard:
             ClipboardOptimizer.shared.optimizeNow()
             LaunchContext.quitIfIdle(after: 4)
+        case .refresh:
+            MenuConfigPublisher.shared.publishNow()
+            LaunchContext.quitIfIdle(after: 1)
         case .showApp:
             LaunchContext.becomeInteractive()
             AppDelegate.showMainWindow()
@@ -226,6 +254,6 @@ final class RequestRouter {
 @Observable
 final class SettingsNavigation {
     static let shared = SettingsNavigation()
-    enum Tab: Hashable { case general, images, video, audio, output, automation, clipboard, finder, presets, engines }
+    enum Tab: String, Hashable { case general, images, video, audio, output, automation, clipboard, finder, drop, presets, engines }
     var tab: Tab = .general
 }

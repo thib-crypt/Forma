@@ -20,6 +20,7 @@ final class MenuConfigPublisher {
         withObservationTracking {
             let p = PreferencesStore.shared.prefs
             _ = p.finder
+            _ = p.drop
             _ = p.recipes
             _ = p.processing.image.preset
             _ = HistoryModel.shared.entries.count
@@ -72,6 +73,10 @@ final class MenuConfigPublisher {
         c.libreOffice = Tool.soffice.isAvailable
         c.sharesFolder = f.sharesFolderURL.path
         c.recipes = prefs.recipes.map(\.summary)
+        if DropServer.isConfigured(prefs.drop) {
+            c.drop = DropMenuConfig(finder: prefs.drop.showInFinder, share: prefs.drop.showInShare, expiry: prefs.drop.expiry,
+                                    host: DropServer.host(of: prefs.drop) ?? "")
+        }
         let entries = HistoryModel.shared.entries
         c.ranked = ranked(entries)
         c.lastBatch = lastExternalBatch(entries)

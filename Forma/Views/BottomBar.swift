@@ -136,6 +136,10 @@ struct BottomBar: View {
             Menu {
                 Button("Planifier pour plus tard…", systemImage: "clock") { showSchedule = true }
                     .disabled(model.pendingCount == 0)
+                Toggle(isOn: Binding(get: { store.prefs.drop.afterProcessing }, set: { store.prefs.drop.afterProcessing = $0 })) {
+                    Label("Envoyer les résultats sur Drop", systemImage: "arrow.up.circle")
+                }
+                .disabled(!DropServer.isConfigured(store.prefs.drop))
                 Button("Réessayer les échecs", systemImage: "arrow.clockwise") { model.retryFailed() }
                 Button("Tout retraiter", systemImage: "arrow.counterclockwise") { model.resetAndRun() }
                     .disabled(model.isRunning)

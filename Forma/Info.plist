@@ -210,6 +210,23 @@
 				<string>public.image</string>
 			</array>
 		</dict>
+		<dict>
+			<key>NSMenuItem</key>
+			<dict>
+				<key>default</key>
+				<string>Forma — Envoyer sur Drop</string>
+			</dict>
+			<key>NSMessage</key>
+			<string>dropFiles</string>
+			<key>NSPortName</key>
+			<string>Forma</string>
+			<key>NSRequiredContext</key>
+			<dict/>
+			<key>NSSendFileTypes</key>
+			<array>
+				<string>public.item</string>
+			</array>
+		</dict>
 	</array>
 </dict>
 </plist>

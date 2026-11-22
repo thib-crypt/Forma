@@ -35,6 +35,8 @@ final class FileItem: Identifiable {
     var startedAt: Date?
     var finishedAt: Date?
     var historyID: UUID?               // history entry of the last successful run (for undo)
+    var dropLinks: [String] = []       // links on Drop (sent after processing, or by hand)
+    var isSendingToDrop = false
 
     init(url: URL) {
         self.url = url
@@ -161,6 +163,8 @@ final class AppModel {
                 group.addTask { await self.lane(images, width: imageWidth, mode: m, snapshot: snap, origin: origin, batch: batch) }
                 group.addTask { await self.lane(media, width: mediaWidth, mode: m, snapshot: snap, origin: origin, batch: batch) }
             }
+            for t in self.dropTasks { await t.value }
+            self.dropTasks.removeAll()
             self.finishBatch(pending, mode: m, elapsed: Date().timeIntervalSince(started))
         }
     }
@@ -206,12 +210,46 @@ final class AppModel {
             item.historyID = result.historyID
             if mode == .upscale, let out = result.outputs.first { item.resolutionBadge = Self.pixelSize(of: out) }
             item.status = result.skipped ? .skipped(result.note ?? "Ignoré") : .done
+            if prefs.drop.afterProcessing, !result.outputs.isEmpty, DropServer.isConfigured(prefs.drop) {
+                dropTasks.append(Task { await self.sendToDrop(item, urls: result.outputs, origin: origin, batch: batch, entry: result.historyID) })
+            }
         } catch is CancellationError {
             item.status = .cancelled
         } catch {
             item.status = Task.isCancelled ? .cancelled : .failed(error.localizedDescription)
         }
         item.finishedAt = Date()
+    }
+
+    // MARK: Drop
+
+    @ObservationIgnored private var dropTasks: [Task<Void, Never>] = []
+
+    /// Sends files to Drop and attaches the links to the row. The link is copied by the caller (batch end or single send).
+    @discardableResult
+    func sendToDrop(_ item: FileItem, urls: [URL], origin: HistoryOrigin = .app, batch: UUID? = nil, entry: UUID? = nil,
+                    copyWhenDone: Bool = false) async -> [String] {
+        let drop = prefs.drop
+        item.isSendingToDrop = true
+        defer { item.isSendingToDrop = false }
+        var links: [String] = []
+        for url in urls {
+            do {
+                let up = try await WorkLimits.uploads.run { () async -> Result<DropUpload, Error> in
+                    do { return .success(try await DropUploader.upload(url, prefs: drop, origin: origin, batch: batch, entry: entry)) }
+                    catch { return .failure(error) }
+                }.get()
+                links.append(up.url)
+            } catch {
+                Toast.show("Drop : \(error.localizedDescription)", symbol: "exclamationmark.triangle")
+            }
+        }
+        item.dropLinks += links
+        if copyWhenDone, !links.isEmpty {
+            DropUploader.copy(links)
+            Toast.show(links.count == 1 ? "Lien Drop copié" : "\(links.count) liens Drop copiés", symbol: "link")
+        }
+        return links
     }
 
     private func finishBatch(_ batch: [FileItem], mode: ProcessMode, elapsed: TimeInterval) {
@@ -230,7 +268,13 @@ final class AppModel {
         guard !done.isEmpty || !failed.isEmpty else { return }
 
         let outputs = done.flatMap(\.outputs)
-        if prefs.autoCopyResult, !outputs.isEmpty {
+        let links = done.flatMap(\.dropLinks)
+        if !links.isEmpty {
+            summary += " · \(links.count) lien\(links.count > 1 ? "s" : "") Drop"
+            lastBatchSummary = summary
+            if prefs.drop.copyLink { DropUploader.copy(links) }
+        }
+        if prefs.autoCopyResult, !outputs.isEmpty, links.isEmpty || !prefs.drop.copyLink {
             let pb = NSPasteboard.general
             pb.clearContents()
             pb.writeObjects(outputs as [NSURL])
@@ -298,6 +342,7 @@ final class AppModel {
         item.note = nil
         item.resolutionBadge = nil
         item.historyID = nil
+        item.dropLinks = []
     }
 
     /// Called after history entries were undone: matching rows go back to "pending" so they can be re-tuned and rerun.

@@ -28,6 +28,8 @@ struct MenuConfig: Codable, Equatable, Sendable {
     var recipes: [RecipeSummary] = []
     /// Last batch started from the Finder or the Share menu that can still be undone.
     var lastBatch: BatchSummary?
+    /// nil = Drop is not configured (no password stored): the menus hide every Drop entry.
+    var drop: DropMenuConfig?
 
     static let defaultFavorites: [String: [String]] = [
         MediaKind.image.rawValue: ["JPEG", "WEBP", "PNG"],
@@ -49,6 +51,8 @@ struct RecipeSummary: Codable, Equatable, Identifiable, Sendable {
     var kinds: [MediaKind]
     var showInFinder: Bool
     var showInShare: Bool
+    /// Optional so a menu.json written by an older Forma still decodes.
+    var sendsToDrop: Bool?
 
     func accepts(_ kind: MediaKind) -> Bool {
         kinds.isEmpty || kinds.contains(kind) || (kind == .document && kinds.contains(.image))

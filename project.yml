@@ -12,7 +12,7 @@ settings:
     DEVELOPMENT_TEAM: PG46BWSK3T
     OTHER_CODE_SIGN_FLAGS: "--timestamp=none"
     SWIFT_VERSION: "5.0"
-    MARKETING_VERSION: "1.3"
+    MARKETING_VERSION: "1.5"
     CURRENT_PROJECT_VERSION: "1"
     MACOSX_DEPLOYMENT_TARGET: "26.0"
     ENABLE_USER_SCRIPT_SANDBOXING: NO
@@ -114,6 +114,11 @@ targets:
             NSPortName: Forma
             NSRequiredContext: {}
             NSSendFileTypes: [public.image]
+          - NSMenuItem: { default: "Forma — Envoyer sur Drop" }
+            NSMessage: dropFiles
+            NSPortName: Forma
+            NSRequiredContext: {}
+            NSSendFileTypes: [public.item]
     settings:
       base:
         PRODUCT_NAME: Forma

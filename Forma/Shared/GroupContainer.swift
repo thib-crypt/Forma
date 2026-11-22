@@ -64,13 +64,32 @@ enum GroupContainer {
         config.promptsUserIfNeeded = false
         config.arguments = ["--headless"]
         let url = jobURL(id)
-        if let app = hostApp ?? NSWorkspace.shared.urlForApplication(withBundleIdentifier: appBundleID) {
+        if let app = preferredAppURL(hostApp: hostApp) {
             NSWorkspace.shared.open([url], withApplicationAt: app, configuration: config) { _, error in
                 if let error { NSLog("Forma: cannot wake the app: \(error.localizedDescription)") }
             }
         } else {
             NSWorkspace.shared.open(url, configuration: config) { _, _ in }
         }
+    }
+
+    static let installedAppURL = URL(fileURLWithPath: "/Applications/Forma.app")
+
+    /// A Forma app process already running (GUI or headless; the CLI never has an activation policy).
+    static func runningApp(excludingSelf: Bool = true) -> NSRunningApplication? {
+        let me = ProcessInfo.processInfo.processIdentifier
+        return NSRunningApplication.runningApplications(withBundleIdentifier: appBundleID).first {
+            !$0.isTerminated && $0.activationPolicy != .prohibited && (!excludingSelf || $0.processIdentifier != me)
+        }
+    }
+
+    /// Which copy of Forma.app to hand a request to. Several copies can be registered (/Applications plus the
+    /// Xcode build folders, whose extensions PlugInKit may prefer): opening the URL with a copy that isn't the one
+    /// running would start a second instance, so the running one wins, then /Applications, then the host app.
+    static func preferredAppURL(hostApp: URL? = nil) -> URL? {
+        if let running = runningApp(excludingSelf: false)?.bundleURL { return running }
+        if FileManager.default.fileExists(atPath: installedAppURL.path) { return installedAppURL }
+        return hostApp ?? NSWorkspace.shared.urlForApplication(withBundleIdentifier: appBundleID)
     }
 
     /// Requests still waiting in the inbox, oldest first.

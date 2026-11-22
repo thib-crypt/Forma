@@ -20,15 +20,19 @@ fi
 codesign --verify --deep --strict "$BUILT"
 
 # Quit the running copy (it finishes or cancels its batch first).
-if pgrep -xq "$APP_NAME"; then
+if pgrep -xq "$APP_NAME"; then  # whichever copy is running
   osascript -e "tell application id \"com.thibault.forma\" to quit" >/dev/null 2>&1 || true
   for _ in {1..20}; do pgrep -xq "$APP_NAME" || break; sleep 0.25; done
   pkill -x "$APP_NAME" 2>/dev/null || true
 fi
 
-# The build folder copy must never be the one Launch Services / PlugInKit picks.
-for appex in "$BUILT"/Contents/PlugIns/*.appex(N); do pluginkit -r "$appex" 2>/dev/null || true; done
-"$LSREGISTER" -u "$BUILT" 2>/dev/null || true
+# The build folder copies (Release and Debug) must never be the ones Launch Services / PlugInKit picks:
+# an extension living in a build copy wakes that copy, i.e. a second Forma next to /Applications.
+for copy in "$BUILT" build/Build/Products/Debug/$APP_NAME.app; do
+  [[ -d "$copy" ]] || continue
+  for appex in "$copy"/Contents/PlugIns/*.appex(N); do pluginkit -r "$appex" 2>/dev/null || true; done
+  "$LSREGISTER" -u "$copy" 2>/dev/null || true
+done
 
 rm -rf "$DEST"
 ditto "$BUILT" "$DEST"

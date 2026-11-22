@@ -173,9 +173,58 @@ struct ApplyRecipeIntent: AppIntent {
         for (i, f) in plan.files.enumerated() {
             let res = try await Pipeline.run(input: f.url, mode: plan.mode, snapshot: plan.snapshot, index: i + 1, targetOverride: f.target,
                                              outputFolder: f.outputFolder, origin: .shortcut, batch: batch) { _ in }
+            if let drop = plan.drop {
+                for o in res.outputs { _ = try? await DropUploader.upload(o, options: drop, prefs: prefs.drop, origin: .shortcut, batch: batch, entry: res.historyID) }
+            }
             out += (res.outputs.isEmpty ? [f.url] : res.outputs).map { IntentFile(fileURL: $0, filename: $0.lastPathComponent, type: UTType(filenameExtension: $0.pathExtension)) }
         }
         return .result(value: out)
+    }
+}
+
+enum ShortcutDropExpiry: String, AppEnum {
+    case settings, never, hour, day, week, month
+    static let typeDisplayRepresentation: TypeDisplayRepresentation = "Expiration du lien"
+    static let caseDisplayRepresentations: [ShortcutDropExpiry: DisplayRepresentation] = [
+        .settings: "Selon les réglages Drop", .never: "Jamais", .hour: "1 heure", .day: "1 jour", .week: "7 jours", .month: "30 jours",
+    ]
+    var expiry: DropExpiry? { self == .settings ? nil : DropExpiry(rawValue: rawValue) }
+}
+
+struct SendToDropIntent: AppIntent {
+    static let title: LocalizedStringResource = "Envoyer sur Drop"
+    static let description = IntentDescription("Envoie des fichiers tels quels sur votre serveur Drop et renvoie les liens de partage.")
+    static let openAppWhenRun = false
+
+    @Parameter(title: "Fichiers", supportedContentTypes: [.item])
+    var files: [IntentFile]
+
+    @Parameter(title: "Expiration", default: .settings)
+    var expiry: ShortcutDropExpiry
+
+    @Parameter(title: "Copier le lien", default: true)
+    var copyLink: Bool
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("Envoyer \(\.$files) sur Drop") {
+            \.$expiry
+            \.$copyLink
+        }
+    }
+
+    func perform() async throws -> some IntentResult & ReturnsValue<[URL]> {
+        let prefs = PreferencesStore.loadSnapshot().drop
+        guard DropServer.isConfigured(prefs) else { throw DropError.notConfigured }
+        var options = DropOptions()
+        options.expiry = expiry.expiry
+        let batch = UUID()
+        var links: [URL] = []
+        for u in try IntentRunner.urls(from: files) {
+            let up = try await DropUploader.upload(u, options: options, prefs: prefs, origin: .shortcut, batch: batch)
+            if let link = URL(string: up.url) { links.append(link) }
+        }
+        if copyLink, !links.isEmpty { await MainActor.run { DropUploader.copy(links.map(\.absoluteString)) } }
+        return .result(value: links)
     }
 }
 
@@ -191,6 +240,8 @@ struct UndoLastBatchIntent: AppIntent {
         var done: [UUID] = []
         for e in batch { if (try? HistoryUndo.undo(e)) != nil { done.append(e.id) } }
         HistoryStore.shared.markUndone(done)
+        let remote = DropUploader.records(forEntries: done).filter { !$0.isDeleted }
+        if !remote.isEmpty { await DropUploader.delete(remote, prefs: PreferencesStore.loadSnapshot().drop) }
         return .result(value: "\(done.count) traitement\(done.count > 1 ? "s" : "") annulé\(done.count > 1 ? "s" : "").")
     }
 }
@@ -217,6 +268,8 @@ struct FormaShortcuts: AppShortcutsProvider {
                     shortTitle: "Agrandir ×2", systemImageName: "sparkles")
         AppShortcut(intent: ApplyRecipeIntent(), phrases: ["Appliquer une recette \(.applicationName)", "Apply a \(.applicationName) recipe"],
                     shortTitle: "Recette", systemImageName: "wand.and.stars")
+        AppShortcut(intent: SendToDropIntent(), phrases: ["Envoyer sur Drop avec \(.applicationName)", "Send to Drop with \(.applicationName)"],
+                    shortTitle: "Envoyer sur Drop", systemImageName: "arrow.up.circle")
         AppShortcut(intent: UndoLastBatchIntent(), phrases: ["Annuler le dernier traitement \(.applicationName)", "Undo last \(.applicationName) batch"],
                     shortTitle: "Annuler", systemImageName: "arrow.uturn.backward")
         AppShortcut(intent: OptimizeClipboardIntent(), phrases: ["Optimiser le presse-papiers avec \(.applicationName)"],

@@ -8,9 +8,17 @@ enum FormaMain {
         if CLI.shouldHandle(args) {
             exit(CLI.run(args))
         }
+        // Only one Forma app process at a time (several copies of Forma.app can be registered: /Applications and
+        // the Xcode build folders). A second one hands what it was launched for to the first, then quits.
+        if !InstanceLock.acquire() {
+            DuplicateLaunch.run(headless: args.contains("--headless"))
+        }
         // Launched by the Finder / Share extension: no window, no Dock icon (decided before NSApp exists).
         if LaunchContext.detectHeadless(args) {
             MainActor.assumeIsolated { LaunchContext.headless = true }
+            NSApplication.shared.setActivationPolicy(.accessory)
+        } else if PreferencesStore.loadSnapshot().effectiveDockIcon != .always {
+            // "Barre des menus" presence: never flash a Dock icon at launch (a window brings it back if wanted).
             NSApplication.shared.setActivationPolicy(.accessory)
         }
         FormaApp.main()
@@ -19,53 +27,13 @@ enum FormaMain {
 
 struct FormaApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
-    @State private var store = PreferencesStore.shared
-    @State private var model = AppModel.shared
 
     var body: some Scene {
-        Window("Forma", id: "main") {
-            MainView()
-                .environment(model)
-                .environment(store)
-                .frame(minWidth: 760, minHeight: 520)
-                .preferredColorScheme(store.colorScheme)
-                .background(WindowOpenerBridge())
-        }
-        .defaultSize(width: 980, height: 660)
-        .defaultLaunchBehavior(LaunchContext.headless ? .suppressed : .presented)
-        .restorationBehavior(.disabled)
-        .windowToolbarStyle(.unified)
-        .commands { FormaCommands(model: model, store: store) }
-
-        Window("Historique", id: "history") {
-            HistoryView()
-                .environment(model)
-                .environment(store)
-                .preferredColorScheme(store.colorScheme)
-        }
-        .defaultSize(width: 820, height: 640)
-        .keyboardShortcut("y", modifiers: .command)
-        .restorationBehavior(.disabled)
-
-        Settings {
-            SettingsView()
-                .environment(model)
-                .environment(store)
-                .preferredColorScheme(store.colorScheme)
-        }
-    }
-}
-
-/// Captures SwiftUI's openWindow so AppKit entry points (Services, Dock, CLI) can show the main window.
-private struct WindowOpenerBridge: View {
-    @Environment(\.openWindow) private var openWindow
-    @Environment(\.openSettings) private var openSettings
-    var body: some View {
-        Color.clear.onAppear {
-            AppDelegate.openMain = { openWindow(id: "main") }
-            AppDelegate.openHistory = { openWindow(id: "history") }
-            AppDelegate.openSettingsWindow = { openSettings() }
-        }
+        // Forma's windows belong to `WindowRouter` (AppKit), so they can be opened from the Dock, the menu bar,
+        // the Finder or a shortcut even when no SwiftUI view exists yet. This scene only carries the menus
+        // and is never shown: its "Réglages…" item is replaced below.
+        Settings { EmptyView() }
+            .commands { FormaCommands(model: AppModel.shared, store: PreferencesStore.shared) }
     }
 }
 
@@ -74,6 +42,15 @@ struct FormaCommands: Commands {
     let store: PreferencesStore
 
     var body: some Commands {
+        CommandGroup(replacing: .appSettings) {
+            Button("Réglages…") { AppDelegate.showSettings() }.keyboardShortcut(",")
+        }
+        CommandGroup(before: .windowList) {
+            Button("Forma") { AppDelegate.showMainWindow() }.keyboardShortcut("0")
+            Button("Historique") { AppDelegate.showHistory() }.keyboardShortcut("y")
+            Button("Envois Drop") { AppDelegate.showDrop() }.keyboardShortcut("d", modifiers: [.command, .shift])
+            Divider()
+        }
         CommandGroup(replacing: .newItem) {
             Button("Ajouter des fichiers…") { AddPanel.present() }.keyboardShortcut("o")
         }
@@ -104,6 +81,13 @@ struct FormaCommands: Commands {
             Divider()
             Button("Optimiser le presse-papiers") { ClipboardOptimizer.shared.optimizeNow() }.keyboardShortcut("v", modifiers: [.command, .option])
         }
+        CommandMenu("Drop") {
+            Button("Envoyer des fichiers sur Drop…") { DropActions.pickAndUpload() }.keyboardShortcut("u", modifiers: [.command, .shift])
+            Button("Envoyer le presse-papiers sur Drop") { DropActions.uploadClipboard() }.keyboardShortcut("u", modifiers: [.command, .option])
+            Divider()
+            Button("Afficher les envois") { AppDelegate.showDrop() }
+            Button("Réglages Drop…") { SettingsNavigation.shared.tab = .drop; AppDelegate.showSettings() }
+        }
     }
 }
 
@@ -120,40 +104,12 @@ enum AddPanel {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    static var openMain: (() -> Void)?
-    static var openHistory: (() -> Void)?
-    static var openSettingsWindow: (() -> Void)?
     private let services = ServicesProvider()
 
-    @MainActor static func showMainWindow() {
-        LaunchContext.becomeInteractive()
-        NSApp.activate()
-        if let w = NSApp.windows.first(where: { $0.identifier?.rawValue == "main" || $0.title == "Forma" }) {
-            w.makeKeyAndOrderFront(nil)
-        } else {
-            openMain?()
-        }
-    }
-
-    @MainActor static func showHistory() {
-        MenuBarController.shared.close(animated: false)
-        LaunchContext.becomeInteractive()
-        NSApp.activate()
-        if let w = NSApp.windows.first(where: { $0.identifier?.rawValue == "history" }), w.isVisible {
-            w.makeKeyAndOrderFront(nil)
-        } else if let open = openHistory {
-            open()
-        } else {
-            showMainWindow()
-        }
-    }
-
-    @MainActor static func showSettings() {
-        MenuBarController.shared.close(animated: false)
-        LaunchContext.becomeInteractive()
-        NSApp.activate()
-        if let open = openSettingsWindow { open() } else { showMainWindow() }
-    }
+    @MainActor static func showMainWindow() { WindowRouter.shared.show(.main) }
+    @MainActor static func showHistory() { WindowRouter.shared.show(.history) }
+    @MainActor static func showDrop() { WindowRouter.shared.show(.drop) }
+    @MainActor static func showSettings() { WindowRouter.shared.showSettings() }
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         MainActor.assumeIsolated {
@@ -174,13 +130,53 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ClipboardOptimizer.shared.apply()
             MenuBarController.shared.install()
             MenuConfigPublisher.shared.start()
+            GlobalHotKeyCenter.shared.reload()
+            DockProgress.shared.start()
             RequestRouter.shared.drainInbox()
             observeWindowsForDockPolicy()
+            presentAtLaunch(notification)
             LaunchContext.updateDockPolicy()
             // Safety net: a headless launch whose request vanished must not linger.
             LaunchContext.quitIfIdle(after: 15)
         }
         cleanupOrphanedTemps()
+    }
+
+    /// What an ordinary launch shows. Launches made to open files or links show what those need instead.
+    @MainActor private func presentAtLaunch(_ notification: Notification) {
+        guard !LaunchContext.headless else { return }
+        let event = NSAppleEventManager.shared().currentAppleEvent
+        let loginItem = event?.eventID == kAEOpenApplication
+            && event?.paramDescriptor(forKeyword: keyAEPropData)?.enumCodeValue == keyAELaunchedAsLogInItem
+        let isDefault = notification.userInfo?[NSApplication.launchIsDefaultUserInfoKey] as? Bool ?? true
+        let prefs = PreferencesStore.shared.prefs
+        if !isDefault {
+            // Opened for a file (it shows the window itself) or a forma:// link (works in the background).
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                MainActor.assumeIsolated {
+                    if !LaunchContext.hasVisibleWindow && !WindowRouter.shared.isVisible(.main) {
+                        LaunchContext.headless = true
+                        LaunchContext.updateDockPolicy()
+                        LaunchContext.quitIfIdle(after: 15)
+                    }
+                }
+            }
+            return
+        }
+        if prefs.showInMenuBar && (loginItem || !prefs.showWindowAtLaunch) {
+            // Lives in the menu bar: a manual launch opens the panel under the icon, so you see where Forma is.
+            if !loginItem {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    MainActor.assumeIsolated { MenuBarController.shared.open() }
+                }
+            }
+            return
+        }
+        WindowRouter.shared.show(.main)
+    }
+
+    func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
+        MainActor.assumeIsolated { DockMenu.make() }
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
@@ -213,8 +209,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        if !flag { MainActor.assumeIsolated { AppDelegate.showMainWindow() } }
-        return true
+        // `flag` counts panels (HUD, menu bar panel), so decide on Forma's real windows.
+        MainActor.assumeIsolated {
+            if !LaunchContext.hasVisibleWindow { AppDelegate.showMainWindow() }
+        }
+        return false
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {

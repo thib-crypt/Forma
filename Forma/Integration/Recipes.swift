@@ -14,6 +14,8 @@ struct Recipe: Codable, Equatable, Identifiable, Sendable {
     var showInFinder = true
     var showInShare = true
     var showInMenuBar = true
+    /// Send every result to Drop and copy the link ("Web" → a ready-to-paste URL).
+    var drop: DropOptions?
 
     /// Kinds this recipe processes (empty = all).
     var kinds: [MediaKind] {
@@ -30,7 +32,8 @@ struct Recipe: Codable, Equatable, Identifiable, Sendable {
     }
 
     var summary: RecipeSummary {
-        RecipeSummary(id: id, name: name, symbol: symbol, mode: mode, kinds: kinds, showInFinder: showInFinder, showInShare: showInShare)
+        RecipeSummary(id: id, name: name, symbol: symbol, mode: mode, kinds: kinds, showInFinder: showInFinder, showInShare: showInShare,
+                      sendsToDrop: drop != nil ? true : nil)
     }
 
     /// One line describing what the recipe does ("Images → WebP · 1920 px · sans métadonnées").
@@ -51,6 +54,7 @@ struct Recipe: Codable, Equatable, Identifiable, Sendable {
         if let m = o.metadata { parts.append(m == .stripAll ? "sans métadonnées" : m == .keepAll ? "métadonnées conservées" : "métadonnées essentielles") }
         if o.replaceOriginals == true { parts.append("remplace les originaux") }
         if destination != .standard { parts.append(destination.label.lowercased()) }
+        if drop != nil { parts.append("envoi sur Drop") }
         return parts.joined(separator: " · ")
     }
 

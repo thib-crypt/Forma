@@ -108,7 +108,7 @@ final class FinderSync: FIFinderSync {
             urls = controller.selectedItemURLs() ?? []
             if urls.isEmpty { urls = menuSelection }
         }
-        let needsFiles: Set<RequestAction> = [.process, .recipe, .open, .watch]
+        let needsFiles: Set<RequestAction> = [.process, .recipe, .open, .watch, .upload]
         if needsFiles.contains(entry.action), urls.isEmpty { NSSound.beep(); return }
         let request = MenuBuilder.request(for: entry, paths: urls.map(\.path), source: .finder)
         do {

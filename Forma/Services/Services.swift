@@ -78,6 +78,13 @@ final class ServicesProvider: NSObject {
     @objc func upscaleFiles(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
         handle(pboard, mode: .upscale, start: true)
     }
+    @objc func dropFiles(_ pboard: NSPasteboard, userData: String?, error: AutoreleasingUnsafeMutablePointer<NSString?>) {
+        let urls = (pboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]) ?? []
+        Task { @MainActor in
+            guard !urls.isEmpty else { NSSound.beep(); return }
+            DropActions.upload(urls, source: .service)
+        }
+    }
     /// "Ajouter" fills the window as before; the other services run in the background (`JobCenter`), without a window.
     private func handle(_ pb: NSPasteboard, mode: ProcessMode?, start: Bool) {
         let urls = (pb.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]) ?? []
