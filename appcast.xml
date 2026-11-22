@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>Forma</title>
+    <link>https://github.com/thib-crypt/Forma</link>
+    <item>
+      <title>Forma 1.5</title>
+      <pubDate>Sun, 22 Nov 2026 17:35:22 +0000</pubDate>
+      <sparkle:version>7</sparkle:version>
+      <sparkle:shortVersionString>1.5</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+      <sparkle:fullReleaseNotesLink>https://github.com/thib-crypt/Forma/releases/tag/v1.5</sparkle:fullReleaseNotesLink>
+      <description><![CDATA[<ul>
+<li>Automatic updates with Sparkle (appcast on GitHub, EdDSA-signed notarized DMGs)</li>
+<li>Prepare for distribution: MIT license, README, release script (signed + notarized DMG)</li>
+<li>Forma 1.4–1.5: Drop uploads, window router, Dock/menu-bar presence</li>
+<li>Forma 1.3: Finder menu, Share extension, background jobs, recipes</li>
+<li>Forma 1.1–1.2: history &amp; undo, preview, clipboard rules, menu bar panel, documents</li>
+<li>Add AI upscale ×2 mode (Apple super-resolution on the Neural Engine)</li>
+<li>Forma 1.0: native macOS converter &amp; compressor (images, video, audio, PDF)</li>
+</ul>]]></description>
+      <enclosure url="https://github.com/thib-crypt/Forma/releases/download/v1.5/Forma-1.5.dmg" sparkle:edSignature="8S88mcObhtYvMebfWDVE3qVCvF2ZrTmY2RzIRFCP0/uW94QgvRr3pAn5khpxykWLfKPmPrZyhGKJpGP0PC1gDQ==" length="10279589" type="application/octet-stream"/>
+    </item>
+  </channel>
+</rss>
