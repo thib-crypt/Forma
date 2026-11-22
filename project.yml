@@ -44,7 +44,7 @@ targets:
         CFBundleURLTypes:
           - CFBundleURLName: com.thibault.forma
             CFBundleURLSchemes: [forma]
-        NSHumanReadableCopyright: "Convertisseur & compresseur local pour le Mac de Thibault"
+        NSHumanReadableCopyright: "© 2026 Thibault Thevenin"
         NSDesktopFolderUsageDescription: "Forma enregistre les fichiers convertis à côté des originaux."
         NSDocumentsFolderUsageDescription: "Forma enregistre les fichiers convertis à côté des originaux."
         NSDownloadsFolderUsageDescription: "Forma enregistre les fichiers convertis à côté des originaux."

@@ -139,7 +139,7 @@
 	<key>NSDownloadsFolderUsageDescription</key>
 	<string>Forma enregistre les fichiers convertis à côté des originaux.</string>
 	<key>NSHumanReadableCopyright</key>
-	<string>Convertisseur &amp; compresseur local pour le Mac de Thibault</string>
+	<string>© 2026 Thibault Thevenin</string>
 	<key>NSServices</key>
 	<array>
 		<dict>

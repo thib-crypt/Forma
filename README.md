@@ -3,6 +3,13 @@
 Native macOS converter and compressor (SwiftUI, macOS 26, Apple Silicon), modeled on the *features* of Picmal
 (analyzed with REA: bundle, App Intents, binary strings). Original code, design and icon; nothing copied from Picmal.
 
+**Requires** macOS 26 (Tahoe) · Apple Silicon. UI in French.
+
+## Install
+Download the latest `Forma-<version>.dmg` from [Releases](https://github.com/thib-crypt/Forma/releases), open it and drag
+Forma to Applications. The app is signed with a Developer ID and notarized by Apple.
+Optional engines (see [Engines](#engines)) are installed with Homebrew; Forma tells you which one a format needs.
+
 ## Features
 - **Convert**: 59 image formats, 27 audio, 27 video (incl. video → animated GIF / WebP / APNG, audio extraction).
   RAW, PSD, SVG, PDF (page by page), EPS and AI as input.
@@ -99,6 +106,9 @@ Homebrew (optional): `brew install imagemagick ffmpeg ghostscript webp jpeg-xl m
 and `brew install --cask libreoffice` for faithful Word/Excel/PowerPoint layouts and spreadsheet/slide outputs.
 
 ## Build
+Requirements: Xcode 26, [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`).
+The project signs with a Developer ID certificate (team `PG46BWSK3T`): change `DEVELOPMENT_TEAM` and the App Group
+in `project.yml` to build under your own account.
 ```
 scripts/install.sh          # xcodegen + Release build + install in /Applications + register/enable the extensions
 xcodebuild test -scheme Forma -derivedDataPath build -only-testing:FormaTests
@@ -109,3 +119,14 @@ Troubleshooting: `forma finder status` (loaded copy, pending requests), `forma f
 (goes through the same path as a Finder click).
 CLI: Settings › Engines › "`forma` command", then `forma convert *.heic --to jpg`, `forma compress clip.mov`, `forma formats`,
 `forma run Web *.png`, `forma run --list`.
+
+## Release
+```
+scripts/release.sh            # dist/Forma-<version>.dmg — hardened runtime, signed, notarized, stapled
+scripts/release.sh --publish  # + tag v<version> and GitHub Release with the DMG
+```
+The version is `MARKETING_VERSION` in `project.yml`. Notarization uses the Keychain profile `notary`
+(`xcrun notarytool store-credentials notary --apple-id <apple-id> --team-id PG46BWSK3T`, once).
+
+## License
+[MIT](LICENSE)
