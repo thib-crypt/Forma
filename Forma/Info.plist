@@ -228,5 +228,13 @@
 			</array>
 		</dict>
 	</array>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUFeedURL</key>
+	<string>https://raw.githubusercontent.com/thib-crypt/Forma/main/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>QHaJUYJvDIo9rTKXniXZqOJ3xN84d2U/5BjJnu8EbZw=</string>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
 </dict>
 </plist>

@@ -131,6 +131,10 @@ private struct MenuBarHeader: View {
                 Menu {
                     Button("Historique", systemImage: "clock.arrow.circlepath") { AppDelegate.showHistory() }
                     Button("Réglages…", systemImage: "gearshape") { AppDelegate.showSettings() }
+                    Button("Rechercher les mises à jour…", systemImage: "arrow.down.circle") {
+                        MenuBarController.shared.close(animated: false)
+                        Updater.shared.checkForUpdates()
+                    }
                     Divider()
                     Button("Annuler le dernier traitement", systemImage: "arrow.uturn.backward") {
                         HistoryModel.shared.undoLastBatch()

@@ -18,6 +18,10 @@ settings:
     ENABLE_USER_SCRIPT_SANDBOXING: NO
     SWIFT_OPTIMIZATION_LEVEL: "-O"
     DEAD_CODE_STRIPPING: YES
+packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    from: 2.6.0
 targets:
   Forma:
     type: application
@@ -27,6 +31,7 @@ targets:
     dependencies:
       - target: FormaFinder
       - target: FormaShare
+      - package: Sparkle
     scheme:
       testTargets: [FormaTests]
     entitlements:
@@ -39,6 +44,10 @@ targets:
         CFBundleDisplayName: Forma
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        SUFeedURL: https://raw.githubusercontent.com/thib-crypt/Forma/main/appcast.xml
+        SUPublicEDKey: QHaJUYJvDIo9rTKXniXZqOJ3xN84d2U/5BjJnu8EbZw=
+        SUEnableAutomaticChecks: true
+        SUScheduledCheckInterval: 86400
         LSApplicationCategoryType: public.app-category.utilities
         LSMinimumSystemVersion: "26.0"
         CFBundleURLTypes:

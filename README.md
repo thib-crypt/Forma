@@ -105,6 +105,11 @@ Native first: ImageIO / Core Graphics (HEIC, AVIF, JPEG, PNG, TIFF, JP2, ICO, IC
 Homebrew (optional): `brew install imagemagick ffmpeg ghostscript webp jpeg-xl mozjpeg pngquant oxipng gifsicle pandoc`,
 and `brew install --cask libreoffice` for faithful Word/Excel/PowerPoint layouts and spreadsheet/slide outputs.
 
+## Updates
+Forma updates itself with [Sparkle](https://sparkle-project.org): it checks
+[`appcast.xml`](appcast.xml) once a day (and on demand from « Rechercher les mises à jour… »), downloads the new DMG from
+GitHub Releases, verifies its EdDSA signature and Apple notarization, then replaces and relaunches the app.
+
 ## Build
 Requirements: Xcode 26, [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`).
 The project signs with a Developer ID certificate (team `PG46BWSK3T`): change `DEVELOPMENT_TEAM` and the App Group
@@ -123,10 +128,12 @@ CLI: Settings › Engines › "`forma` command", then `forma convert *.heic --to
 ## Release
 ```
 scripts/release.sh            # dist/Forma-<version>.dmg — hardened runtime, signed, notarized, stapled
-scripts/release.sh --publish  # + tag v<version> and GitHub Release with the DMG
+scripts/release.sh --publish  # + tag v<version>, GitHub Release with the DMG, appcast.xml pushed (update goes live)
 ```
-The version is `MARKETING_VERSION` in `project.yml`. Notarization uses the Keychain profile `notary`
-(`xcrun notarytool store-credentials notary --apple-id <apple-id> --team-id PG46BWSK3T`, once).
+The version is `MARKETING_VERSION` in `project.yml`. Only that version needs bumping: the build number Sparkle compares is the commit count.
+Notarization uses the Keychain profile `notary`
+(`xcrun notarytool store-credentials notary --apple-id <apple-id> --team-id PG46BWSK3T`, once); the update signature uses the Sparkle EdDSA key in the
+Keychain (`generate_keys`, once — back it up with `generate_keys -x <file>`).
 
 ## License
 [MIT](LICENSE)

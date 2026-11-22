@@ -150,6 +150,7 @@ final class MenuBarController: NSObject {
         add("Ouvrir Forma", "macwindow") { AppDelegate.showMainWindow() }
         add("Historique", "clock.arrow.circlepath") { AppDelegate.showHistory() }
         add("Réglages…", "gearshape", key: ",") { AppDelegate.showSettings() }
+        add("Rechercher les mises à jour…", "arrow.down.circle") { Updater.shared.checkForUpdates() }
         let recipes = PreferencesStore.shared.prefs.recipes.filter(\.showInMenuBar)
         if !recipes.isEmpty {
             menu.addItem(.separator())

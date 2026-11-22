@@ -42,6 +42,9 @@ struct FormaCommands: Commands {
     let store: PreferencesStore
 
     var body: some Commands {
+        CommandGroup(after: .appInfo) {
+            Button("Rechercher les mises à jour…") { Updater.shared.checkForUpdates() }
+        }
         CommandGroup(replacing: .appSettings) {
             Button("Réglages…") { AppDelegate.showSettings() }.keyboardShortcut(",")
         }
@@ -145,6 +148,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// What an ordinary launch shows. Launches made to open files or links show what those need instead.
     @MainActor private func presentAtLaunch(_ notification: Notification) {
         guard !LaunchContext.headless else { return }
+        // Not for headless launches (Finder / Share requests): they quit as soon as the job is done.
+        Updater.shared.start()
         let event = NSAppleEventManager.shared().currentAppleEvent
         let loginItem = event?.eventID == kAEOpenApplication
             && event?.paramDescriptor(forKeyword: keyAEPropData)?.enumCodeValue == keyAELaunchedAsLogInItem

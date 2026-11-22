@@ -15,7 +15,8 @@ LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchSe
 
 if [[ "${1:-}" != "--no-build" ]]; then
   xcodegen generate --quiet
-  xcodebuild -scheme Forma -configuration Release -derivedDataPath "$BUILD_DIR" build -quiet
+  xcodebuild -scheme Forma -configuration Release -derivedDataPath "$BUILD_DIR" \
+    CURRENT_PROJECT_VERSION="$(git rev-list --count HEAD)" build -quiet
 fi
 codesign --verify --deep --strict "$BUILT"
 

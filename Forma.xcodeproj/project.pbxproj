@@ -14,6 +14,8 @@
 		0AE66F87BE7F957F0822262D /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3DDE14A7C02E4B77132F1EA /* MainView.swift */; };
 		1834F79B22EBA860A8516A4C /* JobCenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32974F5188C2ADEB0507B3F2 /* JobCenter.swift */; };
 		1B6D214925E216D69FBE9B95 /* MenuBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = E07961D5176D2D69DDEC4AE0 /* MenuBuilder.swift */; };
+		1B8C945504A2CEB8E7C6725E /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 55124A191C84E5C43F4A8230 /* Sparkle */; };
+		1D36B02FE114D26C7BDF26DC /* Updater.swift in Sources */ = {isa = PBXBuildFile; fileRef = B132EBD9D7C56C56430DE623 /* Updater.swift */; };
 		1E902E332E32617D8A7F638F /* Tools.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD12C80A08799BD975B118A2 /* Tools.swift */; };
 		23EE30253D8F4CB4D6606272 /* DropUploader.swift in Sources */ = {isa = PBXBuildFile; fileRef = D805581803E30EC4D44BD0E1 /* DropUploader.swift */; };
 		2CBF5881836B6B840AE3FC95 /* FormaShare.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B8B9B301EADF5195095BD33A /* FormaShare.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -174,6 +176,7 @@
 		9CC0F055E2936A1606172285 /* DropViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DropViews.swift; sourceTree = "<group>"; };
 		A951680BEB77C5750A6DA28A /* DropTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DropTypes.swift; sourceTree = "<group>"; };
 		B07BC7FEEE7283C62FECF5F9 /* DropActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DropActions.swift; sourceTree = "<group>"; };
+		B132EBD9D7C56C56430DE623 /* Updater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Updater.swift; sourceTree = "<group>"; };
 		B40B7741A7A02574793B7425 /* Services.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Services.swift; sourceTree = "<group>"; };
 		B8B9B301EADF5195095BD33A /* FormaShare.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = FormaShare.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		BB534D23A6BA8C3C337F31D8 /* InstanceLock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstanceLock.swift; sourceTree = "<group>"; };
@@ -194,6 +197,17 @@
 		F9EB454F70E65241F7B47CBF /* Forma.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Forma.entitlements; sourceTree = "<group>"; };
 		FB10E548CCEC5A8056D75F6D /* FinderSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderSettingsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		C8AE498C5F7E8AC8DC20F5FB /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1B8C945504A2CEB8E7C6725E /* Sparkle in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		09D0E91C7462E1D6DBD7C3AB /* MenuBar */ = {
@@ -354,6 +368,7 @@
 				3F7A2C059158514B158C8E1B /* HistoryModel.swift */,
 				BB534D23A6BA8C3C337F31D8 /* InstanceLock.swift */,
 				3C47C29119BBD9D513BAFD6C /* Presence.swift */,
+				B132EBD9D7C56C56430DE623 /* Updater.swift */,
 				7D3F8D9E773115BC98784694 /* WindowRouter.swift */,
 			);
 			path = App;
@@ -425,6 +440,7 @@
 			buildPhases = (
 				C11816ED1343160C23D72171 /* Sources */,
 				E4BA11537780711623CF3F72 /* Resources */,
+				C8AE498C5F7E8AC8DC20F5FB /* Frameworks */,
 				DD513CF023FA290F83B4FB93 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
@@ -435,6 +451,7 @@
 			);
 			name = Forma;
 			packageProductDependencies = (
+				55124A191C84E5C43F4A8230 /* Sparkle */,
 			);
 			productName = Forma;
 			productReference = 264A9B73EE8314C55721F274 /* Forma.app */;
@@ -510,6 +527,9 @@
 			);
 			mainGroup = 948E0900BCA51B8785095658;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				957B0AA1C5AEEF2C100ABE10 /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A91902B908C35C713400A946 /* Products */;
 			projectDirPath = "";
@@ -605,6 +625,7 @@
 				9F4EB9675CCD63650B0BE81B /* SettingsView.swift in Sources */,
 				5C3EEB74781EEC8E2B192E4E /* SharedTypes.swift in Sources */,
 				1E902E332E32617D8A7F638F /* Tools.swift in Sources */,
+				1D36B02FE114D26C7BDF26DC /* Updater.swift in Sources */,
 				D77E8D4EE145F7F3D117F65E /* UpscaleViews.swift in Sources */,
 				F937CA317265E62AEC45049F /* Upscaler.swift in Sources */,
 				489569F34977A614FBC9D1B8 /* WindowRouter.swift in Sources */,
@@ -1000,6 +1021,25 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		957B0AA1C5AEEF2C100ABE10 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.6.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		55124A191C84E5C43F4A8230 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 957B0AA1C5AEEF2C100ABE10 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 5F544B9276C9BD1AAD79134F /* Project object */;
 }
